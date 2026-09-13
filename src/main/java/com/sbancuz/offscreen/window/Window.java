@@ -135,6 +135,7 @@ public final class Window {
         freeRing();
         restoreMcContext();
         Driver.INSTANCE.removeWindow(this);
+        disposeStack();
     }
 
     public static String sdlError() {
@@ -326,7 +327,7 @@ public final class Window {
     }
 
     public void setUI(HostUI ui) {
-        screenStack.clear();
+        disposeStack();
         screenStack.push(new HostedScreen<>(ui));
     }
 
@@ -373,5 +374,13 @@ public final class Window {
     public void update() {
         if (!isOpen() || screenStack.isEmpty()) return;
         screenStack.runScoped(HostedScreen::update);
+    }
+
+    /** Disposes every hosted UI top-down. Owners guard against reentry. */
+    private void disposeStack() {
+        while (!screenStack.isEmpty()) {
+            screenStack.pop()
+                .dispose();
+        }
     }
 }

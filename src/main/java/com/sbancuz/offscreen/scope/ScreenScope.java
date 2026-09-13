@@ -1,6 +1,5 @@
 package com.sbancuz.offscreen.scope;
 
-import java.util.Objects;
 import java.util.function.Supplier;
 
 import net.minecraft.client.Minecraft;
@@ -15,7 +14,7 @@ public final class ScreenScope implements Scope {
     private boolean savedFocus;
 
     public ScreenScope(final Supplier<GuiScreen> wrapperScreenSupplier) {
-        this.wrapperScreenSupplier = Objects.requireNonNull(wrapperScreenSupplier);
+        this.wrapperScreenSupplier = wrapperScreenSupplier;
     }
 
     @Override

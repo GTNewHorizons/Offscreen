@@ -6,7 +6,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 /**
- * Registry mapping screen types to {@link UIFactory} implementations.
+ * Registry mapping screen types to {@link HostUIFactory} implementations.
  * <p>
  * Resolution walks the screen's class hierarchy from concrete → root,
  * returning the first registered match (nearest superclass).
@@ -17,11 +17,10 @@ public final class UIRegistry {
 
     private UIRegistry() {}
 
-    public static <T, H extends HostUI> void register(Class<T> screenType, UIFactory<H> factory) {
+    public static <T, H extends HostUI> void register(Class<T> screenType, HostUIFactory<H> factory) {
         registrations.add(new Registration<>(screenType, factory));
     }
 
-    @SuppressWarnings("unchecked")
     public static @Nullable HostUI resolve(Object screen) {
         if (screen == null) return null;
         final Class<?> screenClass = screen.getClass();
@@ -58,5 +57,5 @@ public final class UIRegistry {
         registrations.clear();
     }
 
-    private record Registration<T> (Class<T> screenType, UIFactory<?> factory) {}
+    private record Registration<T> (Class<T> screenType, HostUIFactory<?> factory) {}
 }

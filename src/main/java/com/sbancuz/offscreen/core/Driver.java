@@ -34,11 +34,13 @@ public class Driver {
         if (event.phase != TickEvent.Phase.END) return;
         if (Minecraft.getMinecraft().theWorld == null && !windows.isEmpty()) {
             closeAll();
+            SessionRegistry.INSTANCE.disposeAll();
             return;
         }
         for (final Window w : windows.values()) {
             w.update();
         }
+        SessionRegistry.INSTANCE.tickAll();
     }
 
     public void trackWindow(final Window window) {

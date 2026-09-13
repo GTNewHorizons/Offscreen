@@ -2,7 +2,6 @@ package com.sbancuz.offscreen.scope;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
@@ -67,20 +66,20 @@ public final class ScopePipeline implements Scope {
         private final List<Scope> scopes = new ArrayList<>();
 
         public Builder always(final Scope scope) {
-            scopes.add(Objects.requireNonNull(scope));
+            scopes.add(scope);
             return this;
         }
 
         public Builder when(final boolean condition, final Scope scope) {
             if (condition) {
-                scopes.add(Objects.requireNonNull(scope));
+                scopes.add(scope);
             }
             return this;
         }
 
         public Builder ifModLoaded(final String modId, final Supplier<Scope> scopeFactory) {
             if (Loader.isModLoaded(modId)) {
-                scopes.add(Objects.requireNonNull(scopeFactory.get()));
+                scopes.add(scopeFactory.get());
             }
             return this;
         }

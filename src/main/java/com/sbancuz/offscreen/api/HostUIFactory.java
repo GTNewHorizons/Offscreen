@@ -6,7 +6,7 @@ package com.sbancuz.offscreen.api;
  * @param <H> the HostUI type this factory produces
  */
 @FunctionalInterface
-public interface UIFactory<H extends HostUI> {
+public interface HostUIFactory<H extends HostUI> {
 
     H create(Object screen);
 }

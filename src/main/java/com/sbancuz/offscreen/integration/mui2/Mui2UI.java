@@ -39,6 +39,10 @@ public class Mui2UI implements HostUI {
             .build();
     }
 
+    protected final ModularScreen screen() {
+        return screen;
+    }
+
     @Override
     public Scope scope() {
         return scope;
