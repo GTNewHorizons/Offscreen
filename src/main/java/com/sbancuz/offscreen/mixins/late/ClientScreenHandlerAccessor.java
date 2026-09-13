@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.mixins;
+package com.sbancuz.offscreen.mixins.late;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;

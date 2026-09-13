@@ -7,8 +7,7 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
 import com.sbancuz.offscreen.Offscreen;
-
-import cpw.mods.fml.common.Loader;
+import com.sbancuz.offscreen.compat.ModCompat;
 
 public final class ScopePipeline implements Scope {
 
@@ -77,8 +76,8 @@ public final class ScopePipeline implements Scope {
             return this;
         }
 
-        public Builder ifModLoaded(final String modId, final Supplier<Scope> scopeFactory) {
-            if (Loader.isModLoaded(modId)) {
+        public Builder ifMod(final ModCompat mod, final Supplier<Scope> scopeFactory) {
+            if (mod.isLoaded()) {
                 scopes.add(scopeFactory.get());
             }
             return this;

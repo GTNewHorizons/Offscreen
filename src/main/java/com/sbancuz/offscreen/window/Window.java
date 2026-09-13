@@ -24,7 +24,7 @@ import org.lwjglx.opengl.DrawableGL;
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.core.Driver;
-import com.sbancuz.offscreen.mixins.MinecraftAccessor;
+import com.sbancuz.offscreen.mixins.early.MinecraftAccessor;
 import com.sbancuz.offscreen.window.input.FrameEvent;
 import com.sbancuz.offscreen.window.input.InputRouter;
 

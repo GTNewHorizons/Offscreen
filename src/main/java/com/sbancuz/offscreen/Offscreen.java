@@ -10,7 +10,12 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
-@Mod(modid = Offscreen.MODID, version = Tags.VERSION, name = "Offscreen", acceptedMinecraftVersions = "[1.7.10]")
+@Mod(
+    modid = Offscreen.MODID,
+    version = Tags.VERSION,
+    name = "Offscreen",
+    acceptedMinecraftVersions = "[1.7.10]",
+    dependencies = "required-after:gtnhlib;after:modularui2;after:NotEnoughItems;after:Waila")
 public class Offscreen {
 
     public static final String MODID = "offscreen";

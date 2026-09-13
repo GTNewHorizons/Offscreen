@@ -11,7 +11,8 @@ import net.minecraft.client.gui.inventory.GuiContainer;
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.UIRegistry;
-import com.sbancuz.offscreen.integration.nei.NeiScope;
+import com.sbancuz.offscreen.compat.ModCompat;
+import com.sbancuz.offscreen.compat.NeiCompat;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.window.input.FrameEvent;
 import com.sbancuz.offscreen.window.input.MouseShadow;
@@ -21,7 +22,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
 
     private final ScopePipeline windowScopes = ScopePipeline.builder()
-        .ifModLoaded("NotEnoughItems", () -> new NeiScope(this::resolveCurrentContainer))
+        .ifMod(ModCompat.NEI, () -> NeiCompat.windowScope(this::resolveCurrentContainer))
         .build();
 
     private @Nullable GuiContainer resolveCurrentContainer() {

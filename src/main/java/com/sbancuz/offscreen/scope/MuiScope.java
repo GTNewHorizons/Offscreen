@@ -2,7 +2,7 @@ package com.sbancuz.offscreen.scope;
 
 import com.cleanroommc.modularui.api.IMuiScreen;
 import com.cleanroommc.modularui.screen.ModularScreen;
-import com.sbancuz.offscreen.mixins.ClientScreenHandlerAccessor;
+import com.sbancuz.offscreen.mixins.late.ClientScreenHandlerAccessor;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 

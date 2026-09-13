@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.mixins;
+package com.sbancuz.offscreen.mixins.late;
 
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.GuiScreen;

@@ -6,8 +6,8 @@ import net.minecraft.client.gui.inventory.GuiContainer;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
-import com.sbancuz.offscreen.mixins.GuiContainerAccessor;
-import com.sbancuz.offscreen.mixins.GuiScreenAccessor;
+import com.sbancuz.offscreen.mixins.early.GuiContainerAccessor;
+import com.sbancuz.offscreen.mixins.early.GuiScreenAccessor;
 import com.sbancuz.offscreen.scope.Scope;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.scope.ScreenScope;

@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.mixins;
+package com.sbancuz.offscreen.mixins.early;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Timer;

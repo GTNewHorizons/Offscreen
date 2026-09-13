@@ -1,6 +1,9 @@
 package com.sbancuz.offscreen;
 
-import com.sbancuz.offscreen.integration.mui2.TestSyncedGui;
+import com.sbancuz.offscreen.compat.ModCompat;
+import com.sbancuz.offscreen.compat.Mui2Compat;
+import com.sbancuz.offscreen.config.Configs;
+import com.sbancuz.offscreen.config.OffscreenDebugConfig;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -10,15 +13,12 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
 public class CommonProxy {
 
     public void preInit(FMLPreInitializationEvent event) {
-        Config.synchronizeConfiguration(event.getSuggestedConfigurationFile());
+        Configs.registerAll();
     }
 
     public void init(FMLInitializationEvent event) {
-        try {
-            Class.forName("com.cleanroommc.modularui.factory.GuiManager");
-            TestSyncedGui.init();
-        } catch (ClassNotFoundException ignored) {
-            // MUI2 absent: synced test GUI (and only it) is unavailable.
+        if (OffscreenDebugConfig.enableTestUIs && ModCompat.MODULAR_UI2.isLoaded()) {
+            Mui2Compat.initCommon();
         }
     }
 

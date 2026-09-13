@@ -13,10 +13,10 @@ import javax.annotation.Nullable;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.item.ItemStack;
 
-import com.sbancuz.offscreen.mixins.BookmarkPanelAccessor;
-import com.sbancuz.offscreen.mixins.GuiContainerAccessor;
-import com.sbancuz.offscreen.mixins.ItemPanelsAccessor;
-import com.sbancuz.offscreen.mixins.LayoutManagerAccessor;
+import com.sbancuz.offscreen.mixins.early.GuiContainerAccessor;
+import com.sbancuz.offscreen.mixins.late.BookmarkPanelAccessor;
+import com.sbancuz.offscreen.mixins.late.ItemPanelsAccessor;
+import com.sbancuz.offscreen.mixins.late.LayoutManagerAccessor;
 import com.sbancuz.offscreen.scope.Scope;
 
 import codechicken.nei.BookmarkPanel;

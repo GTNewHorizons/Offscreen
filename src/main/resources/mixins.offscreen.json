@@ -1,23 +1,7 @@
 {
   "required": true,
-  "package": "com.sbancuz.offscreen.mixins",
+  "minVersion": "0.8.5-GTNH",
   "refmap": "mixins.offscreen.refmap.json",
-  "compatibilityLevel": "JAVA_8",
-  "client": [
-    "ClientScreenHandlerAccessor",
-    "GLScissorHelperMixin",
-    "GuiContainerAccessor",
-    "GuiDrawMixin",
-    "GuiManagerOffscreenMixin",
-    "GuiScreenAccessor",
-    "GuiScreenBackground",
-    "MinecraftAccessor",
-    "ModularNetworkOffscreenMixin"
-  ],
-  "mixins": [
-    "BookmarkPanelAccessor",
-    "ItemPanelsAccessor",
-    "LayoutManagerAccessor",
-    "SearchFieldMixin"
-  ]
+  "target": "@env(DEFAULT)",
+  "compatibilityLevel": "JAVA_8"
 }
