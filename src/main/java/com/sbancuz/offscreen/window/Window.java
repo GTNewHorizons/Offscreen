@@ -6,6 +6,7 @@ import java.nio.IntBuffer;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.gui.inventory.GuiInventory;
 
 import org.lwjgl.opengl.GL;
 import org.lwjgl.sdl.SDLError;
@@ -18,6 +19,7 @@ import org.lwjgl.sdl.SDL_CommonEvent;
 import org.lwjgl.sdl.SDL_Event;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjglx.input.KeyCodes;
+import org.lwjglx.input.Keyboard;
 import org.lwjglx.opengl.Display;
 import org.lwjglx.opengl.DrawableGL;
 
@@ -266,7 +268,7 @@ public final class Window {
                     // and prefer sdlKeyCode when it is printable.
                     final int rawKeyCode = SDLKeyboard.SDL_GetKeyFromScancode(sdlScanCode, key.mod(), false);
                     char c = Character.MIN_VALUE;
-                    int charSource = sdlKeyCode;
+                    int charSource;
                     // Prefer sdlKeyCode if it is printable, else fall back to raw
                     if (sdlKeyCode >= SDLKeycode.SDLK_SPACE && sdlKeyCode <= SDLKeycode.SDLK_TILDE) {
                         charSource = sdlKeyCode;
@@ -299,6 +301,13 @@ public final class Window {
                         frameEvent.keys[frameEvent.keyCount++].set(lwjglKey, c, key.down())
                             .setSdl(sdlKeyCode, sdlScanCode, key.mod());
                     }
+
+                    if (focusState) {
+                        final ByteBuffer keyArray = Keyboard.sdlKeyPressedArray;
+                        if (keyArray != null && sdlScanCode > 0 && sdlScanCode < keyArray.limit()) {
+                            keyArray.put(sdlScanCode, (byte) (key.down() ? 1 : 0));
+                        }
+                    }
                 }
                 case SDLEvents.SDL_EVENT_TEXT_INPUT -> {
                     final String text = event.text()
@@ -327,6 +336,12 @@ public final class Window {
     }
 
     public void setUI(HostUI ui) {
+        if (ui.getGuiScreen() instanceof GuiInventory) {
+            Offscreen.LOG.error("[Offscreen] Inventories are not supported in a separate window");
+
+            destroy();
+            return;
+        }
         disposeStack();
         screenStack.push(new HostedScreen<>(ui));
     }

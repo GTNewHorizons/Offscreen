@@ -116,13 +116,6 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
     }
 
     public void pushStolen(final GuiScreen stolen) {
-        if (stolen instanceof GuiContainer) {
-            Offscreen.LOG.warn(
-                "[Offscreen] inventory screens are not supported in offscreen windows: {}",
-                stolen.getClass()
-                    .getSimpleName());
-            return;
-        }
         final HostUI ui = UIRegistry.resolve(stolen);
         if (ui == null) {
             Offscreen.LOG.warn(
@@ -142,5 +135,4 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
                 .getSimpleName(),
             size());
     }
-
 }

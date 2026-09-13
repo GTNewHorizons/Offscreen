@@ -42,6 +42,7 @@ public final class HostedScreen<T extends HostUI> {
     public void resize(final int guiWidth, final int guiHeight) {
         this.width = guiWidth;
         this.height = guiHeight;
+        this.resizeRequested = false;
 
         screen.getGuiScreen()
             .setWorldAndResolution(mc, guiWidth, guiHeight);

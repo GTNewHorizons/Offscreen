@@ -1,7 +1,6 @@
 package com.sbancuz.offscreen.integration.nei;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -22,7 +21,7 @@ import codechicken.nei.guihook.GuiContainerManager;
 
 public final class NeiWrapperUI implements HostUI {
 
-    private static final Keyboard.KeyEvent[] PRESERVED_KEYS = new Keyboard.KeyEvent[64];
+    private static final Keyboard.KeyEvent[] PRESERVED_KEYS = new Keyboard.KeyEvent[256];
 
     private final HostUI delegate;
 
@@ -107,7 +106,7 @@ public final class NeiWrapperUI implements HostUI {
                 final var queue = Keyboard.eventQueue;
                 int preservedCount = 0;
                 Keyboard.KeyEvent pending;
-                while ((pending = queue.poll()) != null && preservedCount < PRESERVED_KEYS.length) {
+                while (preservedCount < PRESERVED_KEYS.length && (pending = queue.poll()) != null) {
                     PRESERVED_KEYS[preservedCount++] = pending;
                 }
                 try {
@@ -131,12 +130,14 @@ public final class NeiWrapperUI implements HostUI {
                     } finally {
                         if (keyArray != null && sdlScancode > 0 && sdlScancode < keyArray.limit())
                             keyArray.put(sdlScancode, prev);
+
+                        queue.poll();
                     }
                 } finally {
-                    queue.addAll(
-                        Arrays.asList(PRESERVED_KEYS)
-                            .subList(0, preservedCount));
-                    Arrays.fill(PRESERVED_KEYS, 0, preservedCount, null);
+                    for (int i = 0; i < preservedCount; i++) {
+                        queue.add(PRESERVED_KEYS[i]);
+                        PRESERVED_KEYS[i] = null;
+                    }
                 }
             });
         }
@@ -157,7 +158,14 @@ public final class NeiWrapperUI implements HostUI {
         final GuiScreen gs = delegate.getGuiScreen();
         if (!(gs instanceof GuiContainer gc)) return;
         final GuiContainerManager mgr = NeiScope.getManager(gc);
-        if (mgr == null || Minecraft.getMinecraft().theWorld == null) return;
+        if (mgr == null) {
+            Offscreen.LOG.warn(
+                "[Offscreen] NeiWrapper has no manager for {}",
+                gc.getClass()
+                    .getSimpleName());
+            return;
+        }
+        if (Minecraft.getMinecraft().theWorld == null) return;
         try {
             action.accept(mgr);
         } catch (Throwable t) {

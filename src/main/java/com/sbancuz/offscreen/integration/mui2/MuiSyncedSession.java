@@ -17,7 +17,10 @@ import com.cleanroommc.modularui.screen.ModularContainer;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.value.sync.ModularSyncManager;
 import com.sbancuz.offscreen.Offscreen;
+import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.Session;
+import com.sbancuz.offscreen.compat.ModCompat;
+import com.sbancuz.offscreen.compat.NeiCompat;
 import com.sbancuz.offscreen.core.SessionRegistry;
 import com.sbancuz.offscreen.window.Window;
 
@@ -75,6 +78,11 @@ public final class MuiSyncedSession extends Session {
         final Session found = SessionRegistry.INSTANCE
             .find(s -> s instanceof MuiSyncedSession session && !session.isClosed() && session.factory == factory);
         return (MuiSyncedSession) found;
+    }
+
+    /** Whether the server open is still in flight (no screen attached yet). */
+    public boolean isOpening() {
+        return isAwaiting();
     }
 
     private static @Nullable MuiSyncedSession findAwaiting(final UIFactory<?> factory) {
@@ -191,7 +199,11 @@ public final class MuiSyncedSession extends Session {
             final SyncedMui2UI next = new SyncedMui2UI(screen);
             next.setDisposeHook(this::dispose);
             host = next;
-            window().setUI(next);
+            HostUI ui = next;
+            if (ModCompat.NEI.isLoaded()) {
+                ui = NeiCompat.wrapIfNeeded(next);
+            }
+            window().setUI(ui);
         } catch (final Throwable t) {
             Offscreen.LOG.error("[Offscreen] failed to host synced screen", t);
             dispose();

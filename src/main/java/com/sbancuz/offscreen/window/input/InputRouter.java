@@ -67,6 +67,13 @@ public final class InputRouter {
         }
     }
 
+    public void releaseIfOwner(final Window owner) {
+        if (keyShadowOwner == owner) {
+            owner.setFocusState(false);
+            releaseKeyStateShadow();
+        }
+    }
+
     private boolean onSdlEvent(final long userdata, final long eventPtr) {
         if (windows.isEmpty()) return true;
 

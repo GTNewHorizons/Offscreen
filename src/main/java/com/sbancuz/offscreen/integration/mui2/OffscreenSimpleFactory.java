@@ -42,6 +42,9 @@ public class OffscreenSimpleFactory extends SimpleGuiFactory {
     public @Nullable Window toggleOffscreen() {
         final MuiSyncedSession existing = MuiSyncedSession.findActive(this);
         if (existing != null) {
+            // While the open is still in flight the window is blank; key repeats from holding
+            // the toggle key would otherwise open and instantly dispose it (flicker + close).
+            if (existing.isOpening()) return existing.window();
             existing.dispose();
             return null;
         }

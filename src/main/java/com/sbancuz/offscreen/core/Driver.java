@@ -50,6 +50,7 @@ public class Driver {
 
     public void removeWindow(final Window window) {
         if (!windows.containsKey(window.getId())) return;
+        router.releaseIfOwner(window);
         windows.remove(window.getId());
     }
 
