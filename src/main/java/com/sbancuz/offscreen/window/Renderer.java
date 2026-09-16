@@ -2,6 +2,8 @@ package com.sbancuz.offscreen.window;
 
 import java.nio.ByteBuffer;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.client.Minecraft;
 
 import org.lwjgl.opengl.EXTFramebufferObject;
@@ -39,6 +41,13 @@ public final class Renderer {
     private boolean savedMaskB = true;
     private boolean savedMaskA = true;
 
+    private float clearR = 0.08f;
+    private float clearG = 0.09f;
+    private float clearB = 0.11f;
+    private float clearA = 1f;
+
+    private @Nullable Runnable background;
+
     public boolean isTimeToRender() {
         final long now = System.currentTimeMillis();
         if (now < nextFrameMs) return false;
@@ -55,6 +64,26 @@ public final class Renderer {
         }
     }
 
+    public void setClearColor(final float r, final float g, final float b, final float a) {
+        clearR = r;
+        clearG = g;
+        clearB = b;
+        clearA = a;
+    }
+
+    /** Packed {@code 0xAARRGGBB} variant of {@link #setClearColor(float, float, float, float)}. */
+    public void setClearColor(final int argb) {
+        setClearColor(
+            ((argb >> 16) & 0xFF) / 255f,
+            ((argb >> 8) & 0xFF) / 255f,
+            (argb & 0xFF) / 255f,
+            ((argb >>> 24) & 0xFF) / 255f);
+    }
+
+    public void setBackground(final @Nullable Runnable background) {
+        this.background = background;
+    }
+
     public void beginFrame(final int width, final int height, final int guiWidth, final int guiHeight) {
         savedFbo = GL11.glGetInteger(EXTFramebufferObject.GL_FRAMEBUFFER_BINDING_EXT);
         GL11.glGetFloatv(GL11.GL_COLOR_CLEAR_VALUE, savedClear);
@@ -67,8 +96,12 @@ public final class Renderer {
 
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebuffer);
         GL11.glViewport(0, 0, width, height);
-        GL11.glClearColor(0.08f, 0.09f, 0.11f, 1f);
+        GL11.glClearColor(clearR, clearG, clearB, clearA);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
+
+        if (background != null) {
+            background.run();
+        }
 
         GL11.glColorMask(true, true, true, false);
 

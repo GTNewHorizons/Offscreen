@@ -4,6 +4,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.inventory.GuiInventory;
@@ -53,7 +55,9 @@ public final class Window {
     private final Renderer renderer = new Renderer();
     private final HostedStack screenStack = new HostedStack();
 
+    @Getter
     private int pixelWidth = DEFAULT_WIDTH;
+    @Getter
     private int pixelHeight = DEFAULT_HEIGHT;
 
     private int guiWidth = 0;
@@ -386,6 +390,19 @@ public final class Window {
     public void setTitle(String title) {
         SDLVideo.SDL_SetWindowTitle(sdlPtr, title);
         restoreMcContext();
+    }
+
+    public void setClearColor(final float r, final float g, final float b, final float a) {
+        renderer.setClearColor(r, g, b, a);
+    }
+
+    /** Packed {@code 0xAARRGGBB} variant of {@link #setClearColor(float, float, float, float)}. */
+    public void setClearColor(final int argb) {
+        renderer.setClearColor(argb);
+    }
+
+    public void setBackground(final @Nullable Runnable background) {
+        renderer.setBackground(background);
     }
 
     public void update() {

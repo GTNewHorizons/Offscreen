@@ -106,6 +106,22 @@ public final class OffscreenAPI {
         window.setTitle(title);
     }
 
+    public static void setClearColor(@Nullable Window window, float r, float g, float b, float a) {
+        if (window == null) return;
+        window.setClearColor(r, g, b, a);
+    }
+
+    /** Packed {@code 0xAARRGGBB} variant of {@link #setClearColor(Window, float, float, float, float)}. */
+    public static void setClearColor(@Nullable Window window, int argb) {
+        if (window == null) return;
+        window.setClearColor(argb);
+    }
+
+    public static void setBackground(@Nullable Window window, @Nullable Runnable background) {
+        if (window == null) return;
+        window.setBackground(background);
+    }
+
     public static @Nullable Window findByTitle(@Nullable String title) {
         if (title == null) return null;
         for (Window w : Driver.INSTANCE.getWindows()) {
