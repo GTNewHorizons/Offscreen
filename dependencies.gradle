@@ -39,7 +39,7 @@ dependencies {
 
     compileOnly('org.lwjgl:lwjgl-sdl:3.4.2')
     compileOnly('org.lwjgl:lwjgl-opengl:3.3.6')
-    implementation('com.github.GTNewHorizons:lwjgl3ify:3.0.33')
+    compileOnly('com.github.GTNewHorizons:lwjgl3ify:3.0.33')
 
 //    implementation("com.github.GTNewHorizons:waila:1.19.34:dev")
 

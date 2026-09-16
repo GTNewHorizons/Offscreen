@@ -11,7 +11,6 @@ public enum ModCompat {
 
     MODULAR_UI2("modularui2"),
     NEI("NotEnoughItems"),
-    WAILA("Waila"),
     HODGEPODGE("hodgepodge");
 
     private final String modId;

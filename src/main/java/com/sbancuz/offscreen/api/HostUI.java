@@ -3,6 +3,8 @@ package com.sbancuz.offscreen.api;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+import com.sbancuz.offscreen.window.input.KeyEvent;
+import me.eigenraven.lwjgl3ify.api.InputEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 
@@ -61,7 +63,7 @@ public interface HostUI {
         }
         // Keys before text – matches Mui2UI pre-wrapper ordering (keys then text)
         for (int i = 0; i < event.keyCount; i++) {
-            final com.sbancuz.offscreen.window.input.KeyEvent key = event.keys[i];
+            final KeyEvent key = event.keys[i];
             onKeyPressed(key);
         }
         event.keyCount = 0;
@@ -87,18 +89,18 @@ public interface HostUI {
 
     default void onKeyReleased(char typedChar, int keyCode) {}
 
-    default void onKeyPressed(com.sbancuz.offscreen.window.input.KeyEvent key) {
+    default void onKeyPressed(KeyEvent key) {
         if (key.pressed()) onKeyTyped(key.character(), key.keyCode());
         else onKeyReleased(key.character(), key.keyCode());
-        me.eigenraven.lwjgl3ify.api.InputEvents.injectKeyEvent(
-            new me.eigenraven.lwjgl3ify.api.InputEvents.KeyEvent(
+        InputEvents.injectKeyEvent(
+            new InputEvents.KeyEvent(
                 key.keyCode(),
                 0,
                 key.sdlKeyCode(),
                 key.sdlScanCode(),
                 0,
-                key.pressed() ? me.eigenraven.lwjgl3ify.api.InputEvents.KeyAction.PRESSED
-                    : me.eigenraven.lwjgl3ify.api.InputEvents.KeyAction.RELEASED,
+                key.pressed() ? InputEvents.KeyAction.PRESSED
+                    : InputEvents.KeyAction.RELEASED,
                 (short) key.sdlMod(),
                 0L));
     }
