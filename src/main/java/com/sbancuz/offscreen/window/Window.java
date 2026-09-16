@@ -33,7 +33,9 @@ import com.sbancuz.offscreen.window.input.InputRouter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
+import me.eigenraven.lwjgl3ify.api.Lwjgl3Aware;
 
+@Lwjgl3Aware
 public final class Window {
 
     public static final int DEFAULT_WIDTH = 1280;

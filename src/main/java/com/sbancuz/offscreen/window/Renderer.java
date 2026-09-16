@@ -14,6 +14,9 @@ import org.lwjgl.opengl.GL32C;
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.config.OffscreenConfig;
 
+import me.eigenraven.lwjgl3ify.api.Lwjgl3Aware;
+
+@Lwjgl3Aware
 public final class Renderer {
 
     private int targetFps = OffscreenConfig.focusedFps;
