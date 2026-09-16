@@ -15,7 +15,7 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
     version = Tags.VERSION,
     name = "Offscreen",
     acceptedMinecraftVersions = "[1.7.10]",
-    dependencies = "required-after:gtnhlib;after:modularui2;after:NotEnoughItems;after:Waila")
+    dependencies = "required-after:lwjgl3ify;after:angelica;after:modularui2;after:NotEnoughItems")
 public class Offscreen {
 
     public static final String MODID = "offscreen";
