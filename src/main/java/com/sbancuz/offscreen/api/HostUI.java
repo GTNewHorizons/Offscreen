@@ -3,13 +3,14 @@ package com.sbancuz.offscreen.api;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import com.sbancuz.offscreen.window.input.KeyEvent;
-import me.eigenraven.lwjgl3ify.api.InputEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 
 import com.sbancuz.offscreen.scope.Scope;
 import com.sbancuz.offscreen.window.input.FrameEvent;
+import com.sbancuz.offscreen.window.input.KeyEvent;
+
+import me.eigenraven.lwjgl3ify.api.InputEvents;
 
 public interface HostUI {
 
@@ -99,8 +100,7 @@ public interface HostUI {
                 key.sdlKeyCode(),
                 key.sdlScanCode(),
                 0,
-                key.pressed() ? InputEvents.KeyAction.PRESSED
-                    : InputEvents.KeyAction.RELEASED,
+                key.pressed() ? InputEvents.KeyAction.PRESSED : InputEvents.KeyAction.RELEASED,
                 (short) key.sdlMod(),
                 0L));
     }
