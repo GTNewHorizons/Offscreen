@@ -41,13 +41,13 @@ dependencies {
     compileOnly('org.lwjgl:lwjgl-opengl:3.3.6')
     implementation('com.github.GTNewHorizons:lwjgl3ify:3.0.33')
 
-    implementation("com.github.GTNewHorizons:waila:1.19.34:dev")
+//    implementation("com.github.GTNewHorizons:waila:1.19.34:dev")
 
     compileOnly("com.github.GTNewHorizons:ModularUI2:2.3.88-1.7.10:dev")
-    implementation("com.github.GTNewHorizons:ModularUI2:2.3.88-1.7.10:dev")
+//    implementation("com.github.GTNewHorizons:ModularUI2:2.3.88-1.7.10:dev")
 
     compileOnly("com.github.GTNewHorizons:NotEnoughItems:2.8.134-GTNH:dev")
-    implementation("com.github.GTNewHorizons:NotEnoughItems:2.8.134-GTNH:dev")
+//    implementation("com.github.GTNewHorizons:NotEnoughItems:2.8.134-GTNH:dev")
 
     compileOnly('org.projectlombok:lombok:1.18.46')
     annotationProcessor('org.projectlombok:lombok:1.18.46')
