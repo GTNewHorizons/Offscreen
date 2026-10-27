@@ -23,6 +23,7 @@ import org.lwjgl.sdl.SDL_Event;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjglx.input.KeyCodes;
 import org.lwjglx.input.Keyboard;
+import org.lwjglx.opengl.ContextGL;
 import org.lwjglx.opengl.Display;
 import org.lwjglx.opengl.DrawableGL;
 
@@ -37,6 +38,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
 import me.eigenraven.lwjgl3ify.api.Lwjgl3Aware;
+import me.eigenraven.lwjgl3ify.client.MainThreadExec;
 
 @Lwjgl3Aware
 public final class Window {
@@ -48,7 +50,7 @@ public final class Window {
     @Getter
     private volatile int id;
     private long sdlPtr;
-    private long sharedContext;
+    private ContextGL sharedContext;
     private long presentationFence;
 
     @Getter
@@ -70,14 +72,14 @@ public final class Window {
     private int ringTail;
 
     @Setter
-    boolean focusState;
+    volatile boolean focusState;
 
     private final FrameEvent frameEvent = new FrameEvent();
 
     public Window(final String title) {
         this.title = title;
 
-        if (!SDLInit.SDL_Init(SDLInit.SDL_INIT_VIDEO)) {
+        if (!MainThreadExec.runOnMainThread(() -> SDLInit.SDL_Init(SDLInit.SDL_INIT_VIDEO))) {
             Offscreen.LOG.error("[Offscreen] SDL_Init failed: {}", sdlError());
             return;
         }
@@ -91,18 +93,19 @@ public final class Window {
                         .getClass());
                 return;
             }
-            sharedContext = drawable.createSharedContext().sdlContext;
+            sharedContext = drawable.createSharedContext();
         } finally {
             Display.glContextMutex.unlock();
         }
 
         restoreMcContext();
 
-        sdlPtr = SDLVideo.SDL_CreateWindow(
-            title,
-            DEFAULT_WIDTH,
-            DEFAULT_HEIGHT,
-            SDLVideo.SDL_WINDOW_OPENGL | SDLVideo.SDL_WINDOW_RESIZABLE | SDLVideo.SDL_WINDOW_HIDDEN);
+        sdlPtr = MainThreadExec.runOnMainThread(
+            () -> SDLVideo.SDL_CreateWindow(
+                title,
+                DEFAULT_WIDTH,
+                DEFAULT_HEIGHT,
+                SDLVideo.SDL_WINDOW_OPENGL | SDLVideo.SDL_WINDOW_RESIZABLE | SDLVideo.SDL_WINDOW_HIDDEN));
         restoreMcContext();
 
         if (sdlPtr == 0L) {
@@ -112,7 +115,7 @@ public final class Window {
 
         id = SDLVideo.SDL_GetWindowID(sdlPtr);
 
-        if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
+        if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext.sdlContext)) {
             Offscreen.LOG.error("[Offscreen] SDL_GL_MakeCurrent failed: {}", sdlError());
             return;
         }
@@ -121,16 +124,19 @@ public final class Window {
 
         probeDrawableSize();
 
-        if (!SDLVideo.SDL_ShowWindow(sdlPtr)) {
-            Offscreen.LOG.warn("[Offscreen] SDL_ShowWindow failed: {}", sdlError());
-        }
+        Driver.INSTANCE.trackWindow(this);
+        MainThreadExec.runOnMainThread(() -> {
+            if (!SDLVideo.SDL_ShowWindow(sdlPtr)) {
+                Offscreen.LOG.warn("[Offscreen] SDL_ShowWindow failed: {}", sdlError());
+            }
+            focusState = (SDLVideo.SDL_GetWindowFlags(sdlPtr) & SDLVideo.SDL_WINDOW_INPUT_FOCUS) != 0L;
+        });
         restoreMcContext();
 
-        if (!SDLKeyboard.SDL_StartTextInput(sdlPtr)) {
+        if (!MainThreadExec.runOnMainThread(() -> SDLKeyboard.SDL_StartTextInput(sdlPtr))) {
             Offscreen.LOG.warn("[Offscreen] SDL_StartTextInput failed: {}", sdlError());
         }
 
-        Driver.INSTANCE.trackWindow(this);
     }
 
     public boolean isOpen() {
@@ -139,13 +145,15 @@ public final class Window {
 
     public void destroy() {
         if (sdlPtr == 0L) return;
-        SDLKeyboard.SDL_StopTextInput(sdlPtr);
+        MainThreadExec.runOnMainThread(() -> { SDLKeyboard.SDL_StopTextInput(sdlPtr); });
         restoreMcContext();
         awaitPresentation();
         renderer.resetGLContext();
-        SDLVideo.SDL_GL_DestroyContext(sharedContext);
-        sharedContext = 0L;
-        SDLVideo.SDL_DestroyWindow(sdlPtr);
+        MainThreadExec.runOnMainThread(() -> {
+            sharedContext.destroy();
+            SDLVideo.SDL_DestroyWindow(sdlPtr);
+        });
+        sharedContext = null;
         sdlPtr = 0L;
         freeRing();
         restoreMcContext();
@@ -215,7 +223,7 @@ public final class Window {
             long rendered = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
             GL11.glFlush();
             try {
-                if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
+                if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext.sdlContext)) {
                     Offscreen.LOG.error("[Offscreen] present MakeCurrent failed");
                     return;
                 }
@@ -356,7 +364,7 @@ public final class Window {
         .asIntBuffer();
 
     private void probeDrawableSize() {
-        if (!SDLVideo.SDL_GetWindowSizeInPixels(sdlPtr, wPtr, hPtr)) {
+        if (!MainThreadExec.runOnMainThread(() -> SDLVideo.SDL_GetWindowSizeInPixels(sdlPtr, wPtr, hPtr))) {
             return;
         }
         pixelWidth = wPtr.get(0);
@@ -401,7 +409,7 @@ public final class Window {
     }
 
     public void resize(int width, int height) {
-        SDLVideo.SDL_SetWindowSize(sdlPtr, width, height);
+        MainThreadExec.runOnMainThread(() -> { SDLVideo.SDL_SetWindowSize(sdlPtr, width, height); });
         probeDrawableSize();
         if (!screenStack.isEmpty()) {
             screenStack.top()
@@ -411,7 +419,7 @@ public final class Window {
     }
 
     public void setTitle(String title) {
-        SDLVideo.SDL_SetWindowTitle(sdlPtr, title);
+        MainThreadExec.runOnMainThread(() -> { SDLVideo.SDL_SetWindowTitle(sdlPtr, title); });
         restoreMcContext();
     }
 
