@@ -10,7 +10,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.inventory.GuiInventory;
 
-import org.lwjgl.opengl.GL;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL32C;
 import org.lwjgl.sdl.SDLError;
 import org.lwjgl.sdl.SDLEvents;
 import org.lwjgl.sdl.SDLInit;
@@ -48,6 +49,7 @@ public final class Window {
     private volatile int id;
     private long sdlPtr;
     private long sharedContext;
+    private long presentationFence;
 
     @Getter
     private final String title;
@@ -138,6 +140,11 @@ public final class Window {
     public void destroy() {
         if (sdlPtr == 0L) return;
         SDLKeyboard.SDL_StopTextInput(sdlPtr);
+        restoreMcContext();
+        awaitPresentation();
+        renderer.resetGLContext();
+        SDLVideo.SDL_GL_DestroyContext(sharedContext);
+        sharedContext = 0L;
         SDLVideo.SDL_DestroyWindow(sdlPtr);
         sdlPtr = 0L;
         freeRing();
@@ -154,7 +161,6 @@ public final class Window {
     static void restoreMcContext() {
         Display.getDrawable()
             .makeCurrent();
-        GL.createCapabilities();
     }
 
     public void tryRenderFrame() {
@@ -162,12 +168,15 @@ public final class Window {
         renderer.setFocused(focusState);
         if (!renderer.isTimeToRender()) return;
 
-        renderFrame();
-
-        restoreMcContext();
+        try {
+            renderFrame();
+        } finally {
+            restoreMcContext();
+        }
     }
 
     private void renderFrame() {
+        awaitPresentation();
         probeDrawableSize();
 
         final Minecraft mc = Minecraft.getMinecraft();
@@ -203,18 +212,32 @@ public final class Window {
         }
 
         if (renderer.fbo() != 0) {
-            if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
-                Offscreen.LOG.error("[Offscreen] present MakeCurrent failed");
-                Window.restoreMcContext();
-                return;
-            }
+            long rendered = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            GL11.glFlush();
+            try {
+                if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
+                    Offscreen.LOG.error("[Offscreen] present MakeCurrent failed");
+                    return;
+                }
+                GL32C.glWaitSync(rendered, 0, GL32C.GL_TIMEOUT_IGNORED);
+                renderer.present(pixelWidth, pixelHeight);
+                presentationFence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+                GL11.glFlush();
 
-            renderer.present(pixelWidth, pixelHeight);
-
-            if (!SDLVideo.SDL_GL_SwapWindow(sdlPtr)) {
-                Offscreen.LOG.warn("[Offscreen] SDL_GL_SwapWindow failed");
+                if (!SDLVideo.SDL_GL_SwapWindow(sdlPtr)) {
+                    Offscreen.LOG.warn("[Offscreen] SDL_GL_SwapWindow failed");
+                }
+            } finally {
+                GL32C.glDeleteSync(rendered);
             }
         }
+    }
+
+    private void awaitPresentation() {
+        if (presentationFence == 0L) return;
+        GL32C.glWaitSync(presentationFence, 0, GL32C.GL_TIMEOUT_IGNORED);
+        GL32C.glDeleteSync(presentationFence);
+        presentationFence = 0L;
     }
 
     public void capture(final long eventPtr) {

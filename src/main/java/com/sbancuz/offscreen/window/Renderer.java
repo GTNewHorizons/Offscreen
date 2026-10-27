@@ -28,6 +28,8 @@ public final class Renderer {
     private int framebuffer;
     private int colorTexture;
     private int depthStencilBuffer;
+    private int presentationFramebuffer;
+    private int presentationTexture;
 
     private int bufferWidth = -1;
     private int bufferHeight = -1;
@@ -128,7 +130,18 @@ public final class Renderer {
     }
 
     public void present(int pixelWidth, int pixelHeight) {
-        GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, framebuffer);
+        if (presentationFramebuffer == 0) presentationFramebuffer = GL30C.glGenFramebuffers();
+        GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, presentationFramebuffer);
+        if (presentationTexture != colorTexture) {
+            // Framebuffers belong to a context. Only the color texture is shared with Minecraft.
+            GL30C.glFramebufferTexture2D(
+                GL30C.GL_READ_FRAMEBUFFER,
+                GL30C.GL_COLOR_ATTACHMENT0,
+                GL11.GL_TEXTURE_2D,
+                colorTexture,
+                0);
+            presentationTexture = colorTexture;
+        }
         GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, 0);
         final int dw = Math.max(pixelWidth, 1);
         final int dh = Math.max(pixelHeight, 1);
@@ -209,7 +222,8 @@ public final class Renderer {
         return true;
     }
 
-    private void resetGLContext() {
+    void resetGLContext() {
+        presentationTexture = 0;
         if (framebuffer != 0) {
             GL30.glDeleteFramebuffers(framebuffer);
             framebuffer = 0;
