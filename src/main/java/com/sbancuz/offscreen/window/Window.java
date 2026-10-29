@@ -69,7 +69,7 @@ public final class Window {
     private int ringTail;
 
     @Setter
-    volatile boolean focusState;
+    private volatile boolean focusState;
 
     private final FrameEvent frameEvent = new FrameEvent();
 
