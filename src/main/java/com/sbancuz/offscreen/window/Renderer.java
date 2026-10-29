@@ -32,7 +32,7 @@ public final class Renderer {
     private int depthStencilBuffer;
     private int presentationFramebuffer;
     private int presentationTexture;
-    private long presentationFence;
+    volatile private long presentationFence;
 
     private int bufferWidth = -1;
     private int bufferHeight = -1;
