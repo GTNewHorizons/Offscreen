@@ -12,6 +12,8 @@ import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL32C;
+import org.lwjgl.sdl.SDLVideo;
+import org.lwjglx.opengl.ContextGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.config.OffscreenConfig;
@@ -30,6 +32,7 @@ public final class Renderer {
     private int depthStencilBuffer;
     private int presentationFramebuffer;
     private int presentationTexture;
+    private long presentationFence;
 
     private int bufferWidth = -1;
     private int bufferHeight = -1;
@@ -129,7 +132,36 @@ public final class Renderer {
         mc.entityRenderer.setupOverlayRendering();
     }
 
-    public void present(int pixelWidth, int pixelHeight) {
+    public void present(long window, ContextGL context, int pixelWidth, int pixelHeight) {
+        if (framebuffer == 0) return;
+        long rendered = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        GL11.glFlush();
+        try {
+            if (!SDLVideo.SDL_GL_MakeCurrent(window, context.sdlContext)) {
+                Offscreen.LOG.error("[Offscreen] present MakeCurrent failed");
+                return;
+            }
+            GL32C.glWaitSync(rendered, 0, GL32C.GL_TIMEOUT_IGNORED);
+            blit(pixelWidth, pixelHeight);
+            presentationFence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            GL11.glFlush();
+
+            if (!SDLVideo.SDL_GL_SwapWindow(window)) {
+                Offscreen.LOG.warn("[Offscreen] SDL_GL_SwapWindow failed");
+            }
+        } finally {
+            GL32C.glDeleteSync(rendered);
+        }
+    }
+
+    void awaitPresentation() {
+        if (presentationFence == 0L) return;
+        GL32C.glWaitSync(presentationFence, 0, GL32C.GL_TIMEOUT_IGNORED);
+        GL32C.glDeleteSync(presentationFence);
+        presentationFence = 0L;
+    }
+
+    private void blit(int pixelWidth, int pixelHeight) {
         if (presentationFramebuffer == 0) presentationFramebuffer = GL30C.glGenFramebuffers();
         GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, presentationFramebuffer);
         if (presentationTexture != colorTexture) {
@@ -163,10 +195,6 @@ public final class Renderer {
         }
         GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, 0);
         GL11.glFlush();
-    }
-
-    public int fbo() {
-        return framebuffer;
     }
 
     public boolean ensureCorrectSize(int width, int height) {

@@ -10,8 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.inventory.GuiInventory;
 
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL32C;
 import org.lwjgl.sdl.SDLError;
 import org.lwjgl.sdl.SDLEvents;
 import org.lwjgl.sdl.SDLInit;
@@ -51,7 +49,6 @@ public final class Window {
     private volatile int id;
     private long sdlPtr;
     private ContextGL sharedContext;
-    private long presentationFence;
 
     @Getter
     private final String title;
@@ -147,7 +144,7 @@ public final class Window {
         if (sdlPtr == 0L) return;
         MainThreadExec.runOnMainThread(() -> { SDLKeyboard.SDL_StopTextInput(sdlPtr); });
         restoreMcContext();
-        awaitPresentation();
+        renderer.awaitPresentation();
         renderer.resetGLContext();
         MainThreadExec.runOnMainThread(() -> {
             sharedContext.destroy();
@@ -184,7 +181,7 @@ public final class Window {
     }
 
     private void renderFrame() {
-        awaitPresentation();
+        renderer.awaitPresentation();
         probeDrawableSize();
 
         final Minecraft mc = Minecraft.getMinecraft();
@@ -219,33 +216,7 @@ public final class Window {
             renderer.endFrame(mc);
         }
 
-        if (renderer.fbo() != 0) {
-            long rendered = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-            GL11.glFlush();
-            try {
-                if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext.sdlContext)) {
-                    Offscreen.LOG.error("[Offscreen] present MakeCurrent failed");
-                    return;
-                }
-                GL32C.glWaitSync(rendered, 0, GL32C.GL_TIMEOUT_IGNORED);
-                renderer.present(pixelWidth, pixelHeight);
-                presentationFence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-                GL11.glFlush();
-
-                if (!SDLVideo.SDL_GL_SwapWindow(sdlPtr)) {
-                    Offscreen.LOG.warn("[Offscreen] SDL_GL_SwapWindow failed");
-                }
-            } finally {
-                GL32C.glDeleteSync(rendered);
-            }
-        }
-    }
-
-    private void awaitPresentation() {
-        if (presentationFence == 0L) return;
-        GL32C.glWaitSync(presentationFence, 0, GL32C.GL_TIMEOUT_IGNORED);
-        GL32C.glDeleteSync(presentationFence);
-        presentationFence = 0L;
+        renderer.present(sdlPtr, sharedContext, pixelWidth, pixelHeight);
     }
 
     public void capture(final long eventPtr) {
