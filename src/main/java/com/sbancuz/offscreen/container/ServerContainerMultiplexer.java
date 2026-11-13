@@ -581,9 +581,14 @@ public final class ServerContainerMultiplexer {
         mc.thePlayer.inventory.setItemStack(null);
         if (!knowsServerState()) return; // the reset continues
         if (runningSwitch != null && runningSwitch.from == active) {
-            // the server closed the switch's source itself; the switch continues from the inventory
+            final boolean parking = runningSwitch.isParking();
             closeContainer(active);
             active = playerInventory;
+            // a park for the closed window may never be answered
+            if (parking) {
+                abandonRunningProcedure();
+                resyncActive();
+            }
             return;
         }
 
@@ -722,17 +727,31 @@ public final class ServerContainerMultiplexer {
             return true;
         }
 
-        final ItemStack cursor = cursorStack();
-        if (cursor == null) return false;
-        // park on the inventory; without a free slot nothing else happens
-        findParkingSlot(active, cursor).ifPresent(slot -> {
-            phase = Phase.WAITING_FOR_SERVER;
-            clickSlot(active, slot.slotNumber, ok -> {
-                becomeIdle();
-                again.accept(ok);
-            });
-        });
+        if (cursorStack() == null) return false;
+        parkCursorThen(() -> repeatUse(horse));
         return true;
+    }
+
+    /** Parks a loaded cursor before opening another GUI. A refused or rejected park stops the action. */
+    private void parkCursorThen(final Runnable done) {
+        final ItemStack cursor = cursorStack();
+        if (cursor == null) {
+            done.run();
+            return;
+        }
+
+        final Optional<Slot> slot = findParkingSlot(active, cursor);
+        if (slot.isEmpty()) {
+            active.showHint(OverlayHint.NO_PARK_SLOT);
+            return;
+        }
+
+        phase = Phase.WAITING_FOR_SERVER;
+        clickSlot(active, slot.get().slotNumber, ok -> {
+            if (ok) deferred.add(0, done);
+            else active.showHint(OverlayHint.PARK_FAILED);
+            becomeIdle();
+        });
     }
 
     /** The interaction is repeated once if its key is still down. */
@@ -755,8 +774,8 @@ public final class ServerContainerMultiplexer {
             probes.askIfOpen(0, req, ServerProbes.IGNORE, ServerProbes.NOTHING);
         };
         whenIdle(() -> {
-            if (active.isPlayerInventory()) fire.run();
-            else active.showHint(switchTo(playerInventory, false, ok -> { if (ok) fire.run(); }));
+            if (active.isPlayerInventory()) parkCursorThen(fire);
+            else active.showHint(switchTo(playerInventory, true, ok -> { if (ok) fire.run(); }));
         });
     }
 
