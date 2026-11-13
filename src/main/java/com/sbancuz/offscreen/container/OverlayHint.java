@@ -7,24 +7,24 @@ public enum OverlayHint {
     NONE,
     /** refused silently: the multiplexer is busy, the next press will do */
     BUSY,
-    PINNED("The active GUI holds items that would drop"),
-    NO_PARK_SLOT("No free slot for the held item"),
-    PARK_FAILED("Could not park the held item"),
-    CANNOT_REOPEN("Paused: it cannot be reopened from here"),
-    NOT_REOPENED("The server did not reopen it"),
-    HELD_ITEM_LEFT("Held item left in the inventory"),
-    REFRESH_WOULD_LOSE("Refresh would pause the active GUI for good");
+    PINNED("offscreen.container.hint.pinned"),
+    NO_PARK_SLOT("offscreen.container.hint.no_park_slot"),
+    PARK_FAILED("offscreen.container.hint.park_failed"),
+    CANNOT_REOPEN("offscreen.container.hint.cannot_reopen"),
+    NOT_REOPENED("offscreen.container.hint.not_reopened"),
+    HELD_ITEM_LEFT("offscreen.container.hint.held_item_left"),
+    REFRESH_WOULD_LOSE("offscreen.container.hint.refresh_would_lose");
 
-    final String text;
+    final String translationKey;
     final boolean shown;
 
     OverlayHint() {
-        this.text = "";
+        this.translationKey = "";
         this.shown = false;
     }
 
-    OverlayHint(final String text) {
-        this.text = text;
+    OverlayHint(final String translationKey) {
+        this.translationKey = translationKey;
         this.shown = true;
     }
 }

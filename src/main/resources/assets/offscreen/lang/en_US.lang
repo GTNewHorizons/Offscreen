@@ -1,0 +1,12 @@
+offscreen.container.status.unknown=Server state unknown - click to retry
+offscreen.container.status.busy=Busy...
+offscreen.container.status.snapshot=Snapshot - click to activate  [refresh]
+offscreen.container.status.paused=Paused - cannot be reopened from here
+
+offscreen.container.hint.pinned=The active GUI holds items that would drop
+offscreen.container.hint.no_park_slot=No free slot for the held item
+offscreen.container.hint.park_failed=Could not park the held item
+offscreen.container.hint.cannot_reopen=Paused: it cannot be reopened from here
+offscreen.container.hint.not_reopened=The server did not reopen it
+offscreen.container.hint.held_item_left=Held item left in the inventory
+offscreen.container.hint.refresh_would_lose=Refresh would pause the active GUI for good
