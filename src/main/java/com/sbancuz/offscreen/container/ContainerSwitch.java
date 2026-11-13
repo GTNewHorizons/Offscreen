@@ -27,6 +27,7 @@ final class ContainerSwitch {
     private int parkIndex;
     /** The parked cursor stack; null when the cursor was empty. */
     private @Nullable ItemStack parked;
+    private boolean waitingForPark;
 
     ContainerSwitch(final ServerContainerMultiplexer multiplexer, final ServerContainer to, final boolean keepParked,
         final Consumer<Boolean> done) {
@@ -49,10 +50,16 @@ final class ContainerSwitch {
             .orElseThrow(); // checked before the switch started
         final ItemStack stack = cursor.copy();
         parkIndex = park.getSlotIndex();
+        waitingForPark = true;
         multiplexer.clickSlot(from, park.slotNumber, ok -> afterPark(ok, stack));
     }
 
+    boolean isParking() {
+        return waitingForPark;
+    }
+
     private void afterPark(final boolean ok, final ItemStack stack) {
+        waitingForPark = false;
         if (ok) {
             parked = stack;
             releaseAndReopen();

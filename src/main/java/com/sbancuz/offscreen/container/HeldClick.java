@@ -10,10 +10,9 @@ import net.minecraft.item.ItemStack;
 import com.sbancuz.offscreen.mixins.early.GuiContainerAccessor;
 
 /**
- * The press on a gated view that requested its activation, held until the view delivers
- * again. It is replayed only if it still means what it meant when it was made: the
- * same stack under it (or no slot at all), the same cursor stack, the same shift and control.
- * Stacks are compared by item, count and damage.
+ * Saves a mouse press while its view waits for activation.
+ * Replays the press only if the slot contents, cursor stack and modifier keys are unchanged.
+ * Stack comparisons include item, count, damage and NBT.
  */
 public final class HeldClick {
 
@@ -69,8 +68,8 @@ public final class HeldClick {
     boolean meansTheSameOn(@Nullable final GuiScreen s) {
         final Slot slot = slotAt(s);
         if ((slot != null) != onSlot) return false;
-        if (slot != null && !sameStack(slot.getStack(), under)) return false;
-        if (!sameStack(cursorStack(), cursor)) return false;
+        if (slot != null && !ItemStack.areItemStacksEqual(slot.getStack(), under)) return false;
+        if (!ItemStack.areItemStacksEqual(cursorStack(), cursor)) return false;
         return GuiScreen.isShiftKeyDown() == shift && GuiScreen.isCtrlKeyDown() == ctrl;
     }
 
@@ -83,10 +82,5 @@ public final class HeldClick {
 
     private @Nullable ItemStack cursorStack() {
         return Minecraft.getMinecraft().thePlayer.inventory.getItemStack();
-    }
-
-    private boolean sameStack(@Nullable final ItemStack a, @Nullable final ItemStack b) {
-        if (a == null || b == null) return a == b;
-        return a.getItem() == b.getItem() && a.stackSize == b.stackSize && a.getItemDamage() == b.getItemDamage();
     }
 }
