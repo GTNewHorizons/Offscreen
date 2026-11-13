@@ -10,8 +10,7 @@ import cpw.mods.fml.common.Loader;
 public enum ModCompat {
 
     MODULAR_UI2("modularui2"),
-    NEI("NotEnoughItems"),
-    HODGEPODGE("hodgepodge");
+    NEI("NotEnoughItems");
 
     private final String modId;
     private volatile Boolean loaded;

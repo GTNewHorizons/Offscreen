@@ -237,7 +237,7 @@ public final class Window {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
 
-            screenStack.runScoped(mouseX, mouseY, pixelWidth, pixelHeight, s -> {
+            screenStack.runScoped(pixelWidth, pixelHeight, s -> {
                 if (s.needsResize(guiWidth, guiHeight)) {
                     s.resize(guiWidth, guiHeight);
                 }
@@ -266,8 +266,6 @@ public final class Window {
 
     /** Records the window's SDL events into its lwjgl input, as lwjgl3ify records the main window's. */
     private void drainEvents() {
-        final float scaleX = (float) guiWidth / pixelWidth;
-        final float scaleY = (float) guiHeight / pixelHeight;
         while (ringHead != ringTail) {
             final long evAddr = ring.address(ringHead);
             ringHead = (ringHead + 1) % RING_CAPACITY;
@@ -275,10 +273,12 @@ public final class Window {
 
             switch (SDL_CommonEvent.ntype(evAddr)) {
                 case SDLEvents.SDL_EVENT_MOUSE_MOTION -> {
+                    // lwjgl's pixel, y up; the GUI position follows from it as in GuiScreen.handleMouseInput
                     final var motion = event.motion();
-                    mouseX = Math.round(motion.x() * scaleX);
-                    mouseY = Math.round(motion.y() * scaleY);
-                    input.pointerMoved(mouseX, mouseY, guiWidth, guiHeight);
+                    final int pixelX = (int) motion.x(), pixelY = pixelHeight - 1 - (int) motion.y();
+                    input.pointerMoved(pixelX, pixelY);
+                    mouseX = pixelX * guiWidth / pixelWidth;
+                    mouseY = guiHeight - pixelY * guiHeight / pixelHeight - 1;
                 }
                 case SDLEvents.SDL_EVENT_MOUSE_BUTTON_DOWN, SDLEvents.SDL_EVENT_MOUSE_BUTTON_UP -> input.buttonChanged(
                     Mouse.sdlToLwjglMouseButton(
@@ -458,7 +458,7 @@ public final class Window {
         if (!isOpen() || screenStack.isEmpty()) return;
         // lwjgl3ify pumps SDL at the end of the frame, so this tick sees the window's events as the main one sees its
         input.record(this::drainEvents);
-        screenStack.runScoped(mouseX, mouseY, pixelWidth, pixelHeight, s -> {
+        screenStack.runScoped(pixelWidth, pixelHeight, s -> {
             input.deliverListenerEvents();
             s.handleInput();
             s.update();

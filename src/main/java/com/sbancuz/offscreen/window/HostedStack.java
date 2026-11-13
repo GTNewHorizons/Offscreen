@@ -15,7 +15,6 @@ import com.sbancuz.offscreen.compat.ModCompat;
 import com.sbancuz.offscreen.integration.nei.NeiScope;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.window.input.HostedInput;
-import com.sbancuz.offscreen.window.input.MouseShadow;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
@@ -62,20 +61,26 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         }
     }
 
-    /** Runs {@code action} on the top screen in its scopes; the pointer is in GUI coordinates, -1 when unknown. */
-    public void runScoped(final int mouseX, final int mouseY, final int pixelWidth, final int pixelHeight,
-        final Consumer<HostedScreen<?>> action) {
+    /**
+     * Runs {@code action} on the top screen in its scopes. Minecraft's display size is the window's pixel size
+     * throughout, scopes included, so code sizing itself from it ({@code ScaledResolution}, scissor math, vanilla's
+     * mouse conversion) sizes itself for this window.
+     */
+    public void runScoped(final int pixelWidth, final int pixelHeight, final Consumer<HostedScreen<?>> action) {
+        final Minecraft mc = Minecraft.getMinecraft();
         final HostedScreen<?> screen = top();
-        final GuiScreen savedScreen = Minecraft.getMinecraft().currentScreen;
+        final GuiScreen savedScreen = mc.currentScreen;
+        final int mainWidth = mc.displayWidth, mainHeight = mc.displayHeight;
         boolean poisoned = false;
 
+        mc.displayWidth = pixelWidth;
+        mc.displayHeight = pixelHeight;
         windowScopes.enter();
         try {
             screen.scope()
                 .enter();
 
             try {
-                MouseShadow.set(mouseX, mouseY, pixelWidth, pixelHeight);
                 action.accept(screen);
             } catch (final Throwable t) {
                 poisoned = true;
@@ -88,12 +93,13 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
                         Offscreen.LOG.error("[Offscreen] screen-change handling failed", t);
                     }
                 }
-                MouseShadow.clear();
                 screen.scope()
                     .restore();
             }
         } finally {
             windowScopes.restore();
+            mc.displayWidth = mainWidth;
+            mc.displayHeight = mainHeight;
         }
     }
 

@@ -8,8 +8,6 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 
-import net.minecraft.client.Minecraft;
-
 import org.lwjglx.input.Keyboard;
 import org.lwjglx.input.Mouse;
 
@@ -44,8 +42,6 @@ public final class HostedInput implements Scope {
     /** Null when lwjgl3ify's Mouse has another layout: hosted windows then get keyboard input only. */
     private static final Field[] MOUSE_FIELDS = resolveMouseFields();
 
-    private final Minecraft mc = Minecraft.getMinecraft();
-
     private final Object[] windowMouse;
     private final Object[] mainMouse = new Object[MOUSE_FIELD_NAMES.length];
     private Queue<Keyboard.KeyEvent> windowKeys = newKeyQueue();
@@ -71,16 +67,9 @@ public final class HostedInput implements Scope {
         }
     }
 
-    /**
-     * The pointer moved to GUI position {@code guiX, guiY} of a {@code guiWidth x guiHeight} screen. lwjgl's pixel is
-     * chosen so that {@code GuiScreen.handleMouseInput}'s conversion with {@code mc.displayWidth/displayHeight} gives
-     * that position back.
-     */
-    public void pointerMoved(final int guiX, final int guiY, final int guiWidth, final int guiHeight) {
+    /** The pointer moved to lwjgl pixel {@code x, y} of the window, y up. */
+    public void pointerMoved(final int x, final int y) {
         if (MOUSE_FIELDS == null) return;
-        final int width = Math.max(1, guiWidth), height = Math.max(1, guiHeight);
-        final int x = ceilDiv(guiX * mc.displayWidth, width);
-        final int y = ceilDiv((height - 1 - guiY) * mc.displayHeight, height);
         try {
             MOUSE_FIELDS[X].setInt(null, x);
             MOUSE_FIELDS[Y].setInt(null, y);
@@ -216,9 +205,5 @@ public final class HostedInput implements Scope {
         final Queue<Keyboard.KeyEvent> q = new ArrayBlockingQueue<>(KEY_QUEUE_CAPACITY);
         q.add(new Keyboard.KeyEvent(0, 0, '\0', Keyboard.KeyState.RELEASE, System.nanoTime()));
         return q;
-    }
-
-    private static int ceilDiv(final int a, final int b) {
-        return -Math.floorDiv(-a, b);
     }
 }

@@ -36,13 +36,9 @@ public class LateMixinsLoader implements ILateMixinLoader {
         }
         if (loadedMods.contains(ModCompat.NEI.modId())) {
             mixins.add("BookmarkPanelAccessor");
-            mixins.add("GuiDrawMixin");
             mixins.add("ItemPanelsAccessor");
             mixins.add("LayoutManagerAccessor");
             mixins.add("SearchFieldMixin");
-        }
-        if (loadedMods.contains(ModCompat.HODGEPODGE.modId())) {
-            mixins.add("GLScissorHelperMixin");
         }
         return mixins;
     }
