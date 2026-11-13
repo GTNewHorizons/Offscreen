@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.inventory.GuiContainer;
-import net.minecraft.client.resources.I18n;
+import net.minecraft.util.StatCollector;
 
 import org.lwjgl.opengl.GL11;
 
@@ -68,11 +68,11 @@ public final class GatedViewOverlay {
     }
 
     private String badgeLabel(final ServerContainer b) {
-        if (multiplexer.isDegraded()) return I18n.format("offscreen.container.status.unknown");
+        if (multiplexer.isDegraded()) return StatCollector.translateToLocal("offscreen.container.status.unknown");
         if (b == multiplexer.activeContainer() || b.state == State.REOPENING)
-            return I18n.format("offscreen.container.status.busy");
-        if (b.canReopen()) return I18n.format("offscreen.container.status.snapshot");
-        return I18n.format("offscreen.container.status.paused");
+            return StatCollector.translateToLocal("offscreen.container.status.busy");
+        if (b.canReopen()) return StatCollector.translateToLocal("offscreen.container.status.snapshot");
+        return StatCollector.translateToLocal("offscreen.container.status.paused");
     }
 
     private void drawBadge(final ServerContainer b, final int width, final int height) {
@@ -88,7 +88,7 @@ public final class GatedViewOverlay {
 
     private void drawHint(final OverlayHint hint, final int width) {
         final FontRenderer fr = mc.fontRenderer;
-        final String text = I18n.format(hint.translationKey);
+        final String text = StatCollector.translateToLocal(hint.translationKey);
         final int w = fr.getStringWidth(text);
         final int x = (width - w) / 2;
         Gui.drawRect(x - 4, 18, x + w + 4, 30, 0xC0000000);
