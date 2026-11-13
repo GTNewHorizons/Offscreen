@@ -6,7 +6,6 @@ import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.input.Keyboard;
 
 import com.cleanroommc.modularui.screen.ModularScreen;
-import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.OffscreenAPI;
 import com.sbancuz.offscreen.api.UIRegistry;
@@ -40,21 +39,25 @@ public final class Mui2Compat {
     /** Client: maps ModularScreen to its offscreen host. */
     @SideOnly(Side.CLIENT)
     public static void registerClient() {
-        UIRegistry.register(ModularScreen.class, screen -> {
-            final ModularScreen ms = (ModularScreen) screen;
-            final HostUI base;
-            if (SyncedMui2UI.isServerBound(ms)) {
-                Offscreen.LOG
-                    .warn("[Offscreen] server-bound screen hosted without a session; use the factory open overload");
-                base = new SyncedMui2UI(ms);
-            } else {
-                base = new Mui2UI(ms);
-            }
-            if (ModCompat.NEI.isLoaded()) {
-                return NeiCompat.wrapIfNeeded(base);
-            }
-            return base;
-        });
+        UIRegistry.register(ModularScreen.class, screen -> hostFor((ModularScreen) screen));
+        // Server arrivals and moves hand over the wrapper GuiScreen, not the ModularScreen.
+        UIRegistry.register(
+            com.cleanroommc.modularui.screen.GuiContainerWrapper.class,
+            screen -> hostFor(((com.cleanroommc.modularui.api.IMuiScreen) screen).getScreen()));
+        UIRegistry.register(
+            com.cleanroommc.modularui.screen.GuiScreenWrapper.class,
+            screen -> hostFor(((com.cleanroommc.modularui.api.IMuiScreen) screen).getScreen()));
+        com.sbancuz.offscreen.container.ServerContainerMultiplexer.INSTANCE
+            .registerAdapter(com.sbancuz.offscreen.integration.mui2.Mui2Adapter.INSTANCE);
+    }
+
+    @SideOnly(Side.CLIENT)
+    private static HostUI hostFor(final ModularScreen ms) {
+        final HostUI base = SyncedMui2UI.isServerBound(ms) ? new SyncedMui2UI(ms) : new Mui2UI(ms);
+        if (ModCompat.NEI.isLoaded()) {
+            return NeiCompat.wrapIfNeeded(base);
+        }
+        return base;
     }
 
     /** Client: registers the MUI2 test keybinds. Debug-gated by the caller. */

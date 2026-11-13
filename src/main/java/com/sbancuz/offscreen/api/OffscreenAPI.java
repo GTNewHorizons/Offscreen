@@ -6,8 +6,8 @@ import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 
+import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.core.Driver;
-import com.sbancuz.offscreen.core.SessionRegistry;
 import com.sbancuz.offscreen.window.Window;
 
 public final class OffscreenAPI {
@@ -35,11 +35,24 @@ public final class OffscreenAPI {
         return w;
     }
 
+    /**
+     * Opens whatever {@code trigger} makes the server open into a new window titled
+     * {@code title}, which is created when the server's open arrives.
+     * {@code trigger} typically sends a mod packet or calls a GUI factory's client open.
+     */
+    public static void open(final String title, final Runnable trigger) {
+        ServerContainerMultiplexer.INSTANCE.openInWindow(() -> new Window(title), trigger);
+    }
+
+    /** Same, into an existing window: the arrival is pushed on top of what it shows. */
+    public static void open(final Window window, final Runnable trigger) {
+        ServerContainerMultiplexer.INSTANCE.openInWindow(() -> window, trigger);
+    }
+
+    /** Closes every screen of the window as if the player closed it, then the window. */
     public static void close(@Nullable Window window) {
         if (window == null) return;
-        final Session session = SessionRegistry.INSTANCE.get(window);
-        if (session != null) session.dispose();
-        else window.destroy();
+        window.close();
     }
 
     public static void closeAll() {

@@ -13,6 +13,7 @@ import org.lwjglx.input.Keyboard;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
+import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.scope.Scope;
 import com.sbancuz.offscreen.window.input.KeyEvent;
 
@@ -21,7 +22,8 @@ import codechicken.nei.guihook.GuiContainerManager;
 
 public final class NeiWrapperUI implements HostUI {
 
-    private static final Keyboard.KeyEvent[] PRESERVED_KEYS = new Keyboard.KeyEvent[256];
+    /** Hosted key events never pass through the main window's event queue. */
+    private static final java.util.ArrayDeque<Keyboard.KeyEvent> HOSTED_QUEUE = new java.util.ArrayDeque<>(2);
 
     private final HostUI delegate;
 
@@ -101,47 +103,44 @@ public final class NeiWrapperUI implements HostUI {
 
     @Override
     public void onKeyPressed(KeyEvent key) {
-        if (key.pressed()) {
-            withNei(mgr -> {
-                final var queue = Keyboard.eventQueue;
-                int preservedCount = 0;
-                Keyboard.KeyEvent pending;
-                while (preservedCount < PRESERVED_KEYS.length && (pending = queue.poll()) != null) {
-                    PRESERVED_KEYS[preservedCount++] = pending;
-                }
-                try {
-                    Keyboard.addRawKeyEvent(
-                        new Keyboard.KeyEvent(
-                            key.keyCode(),
-                            key.keyCode(),
-                            key.character(),
-                            Keyboard.KeyState.PRESS,
-                            System.nanoTime()));
-                    final ByteBuffer keyArray = Keyboard.sdlKeyPressedArray;
-                    final int sdlScancode = key.sdlScanCode() != 0 ? key.sdlScanCode()
-                        : KeyCodes.lwjglToSdlScancode(key.keyCode());
-                    final byte prev = (keyArray != null && sdlScancode > 0 && sdlScancode < keyArray.limit())
-                        ? keyArray.get(sdlScancode)
-                        : 0;
-                    if (keyArray != null && sdlScancode > 0 && sdlScancode < keyArray.limit())
-                        keyArray.put(sdlScancode, (byte) 1);
-                    try {
-                        mgr.handleKeyboardInput();
-                    } finally {
-                        if (keyArray != null && sdlScancode > 0 && sdlScancode < keyArray.limit())
-                            keyArray.put(sdlScancode, prev);
-
-                        queue.poll();
-                    }
-                } finally {
-                    for (int i = 0; i < preservedCount; i++) {
-                        queue.add(PRESERVED_KEYS[i]);
-                        PRESERVED_KEYS[i] = null;
-                    }
-                }
-            });
-        }
+        if (key.pressed()) withNei(mgr -> withHostedKey(key, () -> pressed(key, mgr)));
         delegate.onKeyPressed(key);
+    }
+
+    /** The key is the only event NEI sees; the main window's queue is untouched. */
+    private static void withHostedKey(final KeyEvent key, final Runnable action) {
+        final var mainQueue = Keyboard.eventQueue;
+        final int code = key.keyCode();
+        HOSTED_QUEUE.clear();
+        HOSTED_QUEUE
+            .add(new Keyboard.KeyEvent(code, code, key.character(), Keyboard.KeyState.PRESS, System.nanoTime()));
+        Keyboard.eventQueue = HOSTED_QUEUE;
+
+        try {
+            action.run();
+        } finally {
+            Keyboard.eventQueue = mainQueue;
+            HOSTED_QUEUE.clear();
+        }
+    }
+
+    /** NEI reads the key as held while it handles it; only a focused hosted window's shadow array is written. */
+    private static void pressed(final KeyEvent key, final GuiContainerManager mgr) {
+        final ByteBuffer keys = Keyboard.sdlKeyPressedArray;
+        int scancode = key.sdlScanCode();
+        if (scancode == 0) scancode = KeyCodes.lwjglToSdlScancode(key.keyCode());
+        if (!Driver.INSTANCE.keyShadowActive() || scancode <= 0 || scancode >= keys.limit()) {
+            mgr.handleKeyboardInput();
+            return;
+        }
+
+        final byte prev = keys.get(scancode);
+        keys.put(scancode, (byte) 1);
+        try {
+            mgr.handleKeyboardInput();
+        } finally {
+            keys.put(scancode, prev);
+        }
     }
 
     @Override

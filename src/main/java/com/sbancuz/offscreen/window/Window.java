@@ -7,8 +7,8 @@ import java.nio.IntBuffer;
 import javax.annotation.Nullable;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.gui.inventory.GuiInventory;
 
 import org.lwjgl.sdl.SDLError;
 import org.lwjgl.sdl.SDLEvents;
@@ -27,7 +27,12 @@ import org.lwjglx.opengl.DrawableGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
+import com.sbancuz.offscreen.api.UIRegistry;
+import com.sbancuz.offscreen.container.ServerContainer;
+import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.container.ServerProbes;
 import com.sbancuz.offscreen.core.Driver;
+import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import com.sbancuz.offscreen.mixins.early.MinecraftAccessor;
 import com.sbancuz.offscreen.window.input.FrameEvent;
 import com.sbancuz.offscreen.window.input.InputRouter;
@@ -55,6 +60,8 @@ public final class Window {
 
     private final Renderer renderer = new Renderer();
     private final HostedStack screenStack = new HostedStack();
+    /** The stack may have become empty; checked on the next frame or tick. */
+    private boolean maybeEmpty;
 
     @Getter
     private int pixelWidth = DEFAULT_WIDTH;
@@ -142,7 +149,11 @@ public final class Window {
 
     public void destroy() {
         if (sdlPtr == 0L) return;
+        // the keyboard shadow is released on every exit path.
+        Driver.INSTANCE.releaseKeyShadow(this);
         MainThreadExec.runOnMainThread(() -> { SDLKeyboard.SDL_StopTextInput(sdlPtr); });
+
+        // the GL context and the SDL window go on the main thread, after the last frame is presented
         restoreMcContext();
         renderer.awaitPresentation();
         renderer.resetGLContext();
@@ -152,6 +163,7 @@ public final class Window {
         });
         sharedContext = null;
         sdlPtr = 0L;
+
         freeRing();
         restoreMcContext();
         Driver.INSTANCE.removeWindow(this);
@@ -168,8 +180,128 @@ public final class Window {
             .makeCurrent();
     }
 
+    public HostedStack stack() {
+        return screenStack;
+    }
+
+    // ================================================================== the stack as the container multiplexer sees it
+
+    /** API or window close of one entry: its view closes as if the player closed it. */
+    public void closeHosted(final HostedScreen<?> e) {
+        if (!screenStack.contains(e)) return;
+        if (ServerContainerMultiplexer.INSTANCE.isInWorld()) e.close(true);
+        else removeFrom(e);
+    }
+
+    /** SDL close request: every view closes as if the player closed it, then the window is destroyed. */
+    public void close() {
+        while (!screenStack.isEmpty()) closeHosted(screenStack.top());
+        if (isOpen()) destroy();
+    }
+
+    /** Pushes the entry for {@code s}; every screen has a host UI, vanilla's at least. */
+    public HostedScreen<?> pushScreen(final GuiScreen s) {
+        final HostedScreen<?> e = new HostedScreen<>(this, hostFor(s));
+        screenStack.pushEntry(e);
+        return e;
+    }
+
+    private HostUI hostFor(final GuiScreen s) {
+        if (UIRegistry.resolve(s) instanceof HostUI ui) return ui;
+        return new VanillaUI(s);
+    }
+
+    /** Pushes {@code s} and lays it out now: initGui must run before the packet handler writes the window id. */
+    public HostedScreen<?> pushNow(final GuiScreen s) {
+        final HostedScreen<?> e = pushScreen(s);
+        layoutNow(e);
+        return e;
+    }
+
+    /**
+     * The new container screen {@code e} replaces the container entry it was pushed over, and that entry's children.
+     */
+    public void replace(final HostedScreen<?> over, final HostedScreen<?> e) {
+        if (!screenStack.contains(over) || !screenStack.contains(e)) return;
+        screenStack.remove(e);
+        removeFrom(over);
+        screenStack.pushEntry(e);
+    }
+
+    /**
+     * A GUI the server opened is pushed over {@code entry}; once known it replaces {@code entry} if that shows a
+     * container too.
+     */
+    public Runnable placeArrivalOver(final HostedScreen<?> entry, final GuiScreen s) {
+        final ServerContainerMultiplexer multiplexer = ServerContainerMultiplexer.INSTANCE;
+        if (!isOpen()) return multiplexer.mainWindow.place(s);
+        final HostedScreen<?> e = pushNow(s);
+        if (multiplexer.containerOf(entry.screen()) == null) return ServerProbes.NOTHING;
+        return () -> replace(entry, e);
+    }
+
+    /**
+     * The GUI of {@code entry} displayed {@code incoming}: back to a screen of the stack, a child, or a replacement.
+     */
+    void applyDisplayRequest(final HostedScreen<?> entry, final GuiScreen incoming) {
+        final HostedScreen<?> existing = screenStack.findEntry(incoming);
+        if (existing != null) {
+            // back to a screen of this stack: pop to it
+            final int above = screenStack.indexOf(existing) + 1;
+            if (above < screenStack.size()) removeFrom(screenStack.get(above));
+            return;
+        }
+        final ServerContainer old = entry.gatingContainer();
+        final ServerContainer now = ServerContainerMultiplexer.INSTANCE.containerOf(incoming);
+        if (!screenStack.contains(entry) || old == null || now == null || now == old) {
+            pushScreen(incoming); // a child of the entry
+            return;
+        }
+        // the GUI replaced itself by one of another container (Baubles back to the inventory)
+        removeFrom(screenStack.boundBaseOf(entry));
+        pushScreen(incoming);
+        ServerContainerMultiplexer.INSTANCE.viewClosed(old, false);
+    }
+
+    /** Removes {@code e} and everything above it. Bindings that lose their view this way are left to the caller. */
+    public void removeFrom(final HostedScreen<?> e) {
+        while (screenStack.contains(e)) {
+            final HostedScreen<?> top = screenStack.top();
+            screenStack.remove(top);
+            // disposed inside its scope: onGuiClosed runs, the container's close logic runs at most once
+            screenStack.runScopedOn(
+                top,
+                false,
+                s -> s.screen()
+                    .onGuiClosed());
+            top.dispose();
+        }
+
+        // an empty hosted window is destroyed on its next frame
+        if (screenStack.isEmpty()) maybeEmpty = true;
+        else screenStack.top()
+            .requestResize();
+    }
+
+    private boolean destroyIfEmpty() {
+        if (!maybeEmpty) return false;
+        maybeEmpty = false;
+        if (!screenStack.isEmpty()) return false;
+        destroy();
+        return true;
+    }
+
+    /** Lays an entry out immediately so that initGui runs before any packet reaches it. */
+    private void layoutNow(final HostedScreen<?> e) {
+        probeDrawableSize();
+        final ScaledResolution resolution = new ScaledResolution(Minecraft.getMinecraft(), pixelWidth, pixelHeight);
+        final int gw = resolution.getScaledWidth();
+        final int gh = resolution.getScaledHeight();
+        screenStack.runScopedOn(e, false, s -> s.resize(gw, gh));
+    }
+
     public void tryRenderFrame() {
-        if (!isOpen()) return;
+        if (!isOpen() || destroyIfEmpty()) return;
         renderer.setFocused(focusState);
         if (!renderer.isTimeToRender()) return;
 
@@ -196,7 +328,8 @@ public final class Window {
         drainFrameEvent();
 
         if (frameEvent.closeRequested) {
-            destroy();
+            frameEvent.closeRequested = false;
+            close();
             return;
         }
 
@@ -204,17 +337,21 @@ public final class Window {
         try {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
+            final HostedScreen<?> top = screenStack.top();
 
-            screenStack.runScoped(frameEvent, pixelWidth, pixelHeight, s -> {
+            screenStack.runScoped(frameEvent, pixelWidth, pixelHeight, top, true, s -> {
                 if (s.needsResize(guiWidth, guiHeight)) {
                     s.resize(guiWidth, guiHeight);
                 }
-                s.dispatchInput(frameEvent, partialTicks);
+                // the entry gates its own input
+                s.deliverInput(frameEvent, partialTicks);
                 s.draw(mc, frameEvent.mouseX, frameEvent.mouseY, partialTicks, now);
+                ServerContainerMultiplexer.INSTANCE.overlay.draw(s, guiWidth, guiHeight);
             });
         } finally {
             renderer.endFrame(mc);
         }
+        if (!isOpen()) return;
 
         renderer.present(sdlPtr, sharedContext, pixelWidth, pixelHeight);
     }
@@ -310,12 +447,7 @@ public final class Window {
                             .setSdl(sdlKeyCode, sdlScanCode, key.mod());
                     }
 
-                    if (focusState) {
-                        final ByteBuffer keyArray = Keyboard.sdlKeyPressedArray;
-                        if (keyArray != null && sdlScanCode > 0 && sdlScanCode < keyArray.limit()) {
-                            keyArray.put(sdlScanCode, (byte) (key.down() ? 1 : 0));
-                        }
-                    }
+                    shadowKey(sdlScanCode, key.down());
                 }
                 case SDLEvents.SDL_EVENT_TEXT_INPUT -> {
                     final String text = event.text()
@@ -325,6 +457,13 @@ public final class Window {
                 default -> {}
             }
         }
+    }
+
+    /** Hosted key state goes only into the shadow this window owns, never into the array SDL owns. */
+    private void shadowKey(final int scancode, final boolean down) {
+        final ByteBuffer keys = Keyboard.sdlKeyPressedArray;
+        if (!Driver.INSTANCE.ownsKeyShadow(this) || keys == null) return;
+        if (scancode > 0 && scancode < keys.limit()) keys.put(scancode, (byte) (down ? 1 : 0));
     }
 
     private final IntBuffer wPtr = ByteBuffer.allocateDirect(4)
@@ -343,36 +482,33 @@ public final class Window {
         restoreMcContext();
     }
 
+    /** Replaces the window's content with {@code ui}; existing views close through 8.3. */
     public void setUI(HostUI ui) {
-        if (ui.getGuiScreen() instanceof GuiInventory) {
-            Offscreen.LOG.error("[Offscreen] Inventories are not supported in a separate window");
-
-            destroy();
-            return;
+        final HostedScreen<?> e = new HostedScreen<>(this, ui);
+        while (!screenStack.isEmpty()) {
+            final int before = screenStack.size();
+            closeHosted(screenStack.get(0));
+            if (screenStack.size() >= before) break;
         }
-        disposeStack();
-        screenStack.push(new HostedScreen<>(ui));
+        if (!isOpen()) return;
+        screenStack.pushEntry(e);
     }
 
     public void push(HostUI ui) {
-        screenStack.push(new HostedScreen<>(ui));
+        screenStack.pushEntry(new HostedScreen<>(this, ui));
     }
 
+    /** Closes the top view through 8.3. The last view is not popped. */
     public boolean pop() {
         if (screenStack.size() <= 1) return false;
-        final HostedScreen<?> popped = screenStack.pop();
-        popped.dispose();
-        if (!screenStack.isEmpty()) {
-            screenStack.top()
-                .requestResize();
-        }
+        closeHosted(screenStack.top());
         return true;
     }
 
     public HostUI getCurrentUI() {
         if (screenStack.isEmpty()) return null;
         return screenStack.top()
-            .screen();
+            .ui();
     }
 
     public int getScreenDepth() {
@@ -408,15 +544,15 @@ public final class Window {
     }
 
     public void update() {
-        if (!isOpen() || screenStack.isEmpty()) return;
+        if (!isOpen() || destroyIfEmpty() || screenStack.isEmpty()) return;
+        final HostedScreen<?> top = screenStack.top();
+        // no updateScreen for a view that is gated
+        if (!top.receivesUpdates()) return;
         screenStack.runScoped(HostedScreen::update);
     }
 
-    /** Disposes every hosted UI top-down. Owners guard against reentry. */
+    /** Disposes every hosted UI top-down without telling the multiplexer. */
     private void disposeStack() {
-        while (!screenStack.isEmpty()) {
-            screenStack.pop()
-                .dispose();
-        }
+        screenStack.disposeAll();
     }
 }

@@ -67,6 +67,14 @@ public final class InputRouter {
         }
     }
 
+    public boolean shadowActive() {
+        return savedKeyArray != null;
+    }
+
+    public boolean ownsShadow(final Window w) {
+        return keyShadowOwner == w && savedKeyArray != null;
+    }
+
     public void releaseIfOwner(final Window owner) {
         if (keyShadowOwner == owner) {
             owner.setFocusState(false);
