@@ -6,13 +6,17 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.item.ItemStack;
 
+import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.mixins.early.GuiContainerAccessor;
 import com.sbancuz.offscreen.mixins.late.BookmarkPanelAccessor;
 import com.sbancuz.offscreen.mixins.late.ItemPanelsAccessor;
@@ -29,6 +33,7 @@ import codechicken.nei.ItemQuantityField;
 import codechicken.nei.ItemZoom;
 import codechicken.nei.LayoutManager;
 import codechicken.nei.NEIController;
+import codechicken.nei.RestartableTask;
 import codechicken.nei.SearchField;
 import codechicken.nei.SubsetWidget;
 import codechicken.nei.Widget;
@@ -64,6 +69,32 @@ public final class NeiScope implements Scope {
     private final Ctx own = new Ctx();
     private final Ctx saved = new Ctx();
     private int enteredCount = 0;
+    /**
+     * Filters the items for this window's search off the game thread, as NEI's own {@code ItemList.updateFilter} does
+     * for the main window; a change while it runs restarts it. The result waits in {@link #filteredItems} for the next
+     * entry, which hands it to the panel on the game thread.
+     */
+    private final RestartableTask filterTask = new RestartableTask("Offscreen NEI Item Filtering") {
+
+        @Override
+        public void execute() {
+            if (!ItemList.loadFinished) return;
+            final ItemFilter filter = own.searchField.getFilter();
+            final ArrayList<ItemStack> filtered;
+            try {
+                filtered = ItemList.forkJoinPool.submit(
+                    () -> ItemList.items.parallelStream()
+                        .filter(item -> filter == null || filter.matches(item))
+                        .collect(Collectors.toCollection(ArrayList::new)))
+                    .get();
+            } catch (final InterruptedException | ExecutionException e) {
+                Offscreen.LOG.warn("[Offscreen] NEI item filtering failed", e);
+                return;
+            }
+            if (!interrupted()) filteredItems.set(filtered);
+        }
+    };
+    private final AtomicReference<ArrayList<ItemStack>> filteredItems = new AtomicReference<>();
 
     public NeiScope(final Supplier<GuiContainer> containerSupplier) {
         this.containerSupplier = containerSupplier;
@@ -95,12 +126,9 @@ public final class NeiScope implements Scope {
         NEIController.manager = saved.manager;
 
         searchFieldScopes.put(own.searchField, this);
+        filterTask.restart();
 
-        ItemsLoadedCallback loadCallback = () -> {
-            if (enteredCount > 0) {
-                filterOffscreenItems(own.searchField.getFilter());
-            }
-        };
+        ItemsLoadedCallback loadCallback = filterTask::restart;
         ItemList.loadCallbacks.add(loadCallback);
     }
 
@@ -134,9 +162,8 @@ public final class NeiScope implements Scope {
             ItemList.loadItems.restart();
         }
 
-        if (ItemList.loadFinished) {
-            filterOffscreenItems(own.searchField.getFilter());
-        }
+        final ArrayList<ItemStack> filtered = filteredItems.getAndSet(null);
+        if (filtered != null) showItems(filtered);
     }
 
     @Override
@@ -160,17 +187,11 @@ public final class NeiScope implements Scope {
     public static void onOffscreenSearchChanged(SearchField field) {
         final NeiScope scope = searchFieldScopes.get(field);
         if (scope != null) {
-            scope.filterOffscreenItems(field.getFilter());
+            scope.filterTask.restart();
         }
     }
 
-    private void filterOffscreenItems(final @Nullable ItemFilter filter) {
-        final ArrayList<ItemStack> result = new ArrayList<>();
-        for (final ItemStack item : ItemList.items) {
-            if (filter == null || filter.matches(item)) {
-                result.add(item);
-            }
-        }
+    private void showItems(final ArrayList<ItemStack> result) {
         own.itemPanel.getGrid()
             .setItems(result);
         own.itemPanel.realItems = result;

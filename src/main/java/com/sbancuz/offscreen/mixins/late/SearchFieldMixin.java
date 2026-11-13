@@ -17,7 +17,8 @@ public class SearchFieldMixin {
         SearchField self = (SearchField) (Object) this;
         if (NeiScope.isOffscreenSearchField(self)) {
             ci.cancel();
-            NeiScope.onOffscreenSearchChanged(self);
+            if (!self.text()
+                .equals(oldText)) NeiScope.onOffscreenSearchChanged(self);
         }
     }
 }

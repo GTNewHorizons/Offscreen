@@ -61,6 +61,7 @@ public class EarlyMixinsLoader implements IFMLLoadingPlugin, IEarlyMixinLoader {
             }
             mixins.add("SDLGPURenderBackendAccessor");
             mixins.add("MinecraftFrameBoundary");
+            mixins.add("MinecraftMixin");
         }
 
         return mixins;

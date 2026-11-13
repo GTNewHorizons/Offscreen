@@ -4,17 +4,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
 
-import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.mixins.early.GuiContainerAccessor;
-import com.sbancuz.offscreen.mixins.early.GuiScreenAccessor;
 import com.sbancuz.offscreen.scope.Scope;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.scope.ScreenScope;
-import com.sbancuz.offscreen.window.input.KeyEvent;
 
-import me.eigenraven.lwjgl3ify.api.InputEvents;
-
+/** Hosts any {@link GuiScreen}; input goes through the screen's own {@code handleInput()}. */
 public class VanillaUI implements HostUI {
 
     private final GuiScreen screen;
@@ -60,42 +56,5 @@ public class VanillaUI implements HostUI {
     @Override
     public void draw(Minecraft mc, final int mouseX, final int mouseY, float partialTicks, long now) {
         screen.drawScreen(mouseX, mouseY, partialTicks);
-    }
-
-    @Override
-    public void onMouseClicked(int mouseX, int mouseY, int button) {
-        if (!(screen instanceof GuiScreenAccessor acc)) return;
-        try {
-            acc.invokeMouseClicked(mouseX, mouseY, button);
-        } catch (final Throwable t) {
-            Offscreen.LOG.trace("[Offscreen] mouseClicked failed", t);
-        }
-    }
-
-    @Override
-    public void onMouseReleased(int mouseX, int mouseY, int button) {
-        if (!(screen instanceof GuiScreenAccessor acc)) return;
-        acc.invokeMouseMovedOrUp(mouseX, mouseY, button);
-    }
-
-    @Override
-    public void onTextInput(String text) {
-        InputEvents.injectTextEvent(new InputEvents.TextEvent(text));
-    }
-
-    @Override
-    public void onKeyTyped(char typedChar, int keyCode) {
-        if (!(screen instanceof GuiScreenAccessor acc)) return;
-        try {
-            acc.invokeKeyTyped(typedChar, keyCode);
-        } catch (final Throwable t) {
-            Offscreen.LOG.trace("[Offscreen] keyTyped failed", t);
-        }
-    }
-
-    @Override
-    public void onKeyPressed(KeyEvent key) {
-        if (key.pressed()) onKeyTyped(key.character(), key.keyCode());
-        else onKeyReleased(key.character(), key.keyCode());
     }
 }

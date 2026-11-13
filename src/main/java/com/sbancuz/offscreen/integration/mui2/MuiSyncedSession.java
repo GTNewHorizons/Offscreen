@@ -17,10 +17,7 @@ import com.cleanroommc.modularui.screen.ModularContainer;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.value.sync.ModularSyncManager;
 import com.sbancuz.offscreen.Offscreen;
-import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.Session;
-import com.sbancuz.offscreen.compat.ModCompat;
-import com.sbancuz.offscreen.compat.NeiCompat;
 import com.sbancuz.offscreen.core.SessionRegistry;
 import com.sbancuz.offscreen.window.Window;
 
@@ -199,11 +196,7 @@ public final class MuiSyncedSession extends Session {
             final SyncedMui2UI next = new SyncedMui2UI(screen);
             next.setDisposeHook(this::dispose);
             host = next;
-            HostUI ui = next;
-            if (ModCompat.NEI.isLoaded()) {
-                ui = NeiCompat.wrapIfNeeded(next);
-            }
-            window().setUI(ui);
+            window().setUI(next);
         } catch (final Throwable t) {
             Offscreen.LOG.error("[Offscreen] failed to host synced screen", t);
             dispose();

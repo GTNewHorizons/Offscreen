@@ -8,6 +8,7 @@ import java.util.function.Predicate;
 
 import net.minecraft.client.Minecraft;
 
+import com.sbancuz.offscreen.window.MainWindow;
 import com.sbancuz.offscreen.window.Window;
 import com.sbancuz.offscreen.window.input.InputRouter;
 
@@ -20,6 +21,7 @@ public class Driver {
 
     private final Map<Integer, Window> windows = new ConcurrentHashMap<>();
     private final InputRouter router = new InputRouter(windows);
+    public final MainWindow mainWindow = new MainWindow();
 
     @SubscribeEvent
     public void onRenderTick(final TickEvent.RenderTickEvent event) {

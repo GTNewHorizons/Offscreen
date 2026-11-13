@@ -2,11 +2,9 @@ package com.sbancuz.offscreen;
 
 import net.minecraft.client.gui.GuiScreen;
 
-import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.compat.ModCompat;
 import com.sbancuz.offscreen.compat.Mui2Compat;
-import com.sbancuz.offscreen.compat.NeiCompat;
 import com.sbancuz.offscreen.config.OffscreenDebugConfig;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.debug.DebugKeys;
@@ -26,15 +24,9 @@ public class ClientProxy extends CommonProxy {
         FMLCommonHandler.instance()
             .bus()
             .register(Driver.INSTANCE);
+        Driver.INSTANCE.mainWindow.register();
 
-        UIRegistry.register(GuiScreen.class, screen -> {
-            final HostUI base = new VanillaUI((GuiScreen) screen);
-            // Wrap GuiContainers with NEI handling so vanilla UIs don't need bespoke NEI code.
-            if (ModCompat.NEI.isLoaded()) {
-                return NeiCompat.wrapIfNeeded(base);
-            }
-            return base;
-        });
+        UIRegistry.register(GuiScreen.class, screen -> new VanillaUI((GuiScreen) screen));
 
         if (ModCompat.MODULAR_UI2.isLoaded()) {
             Mui2Compat.registerClient();
