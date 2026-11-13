@@ -11,4 +11,7 @@ public interface MinecraftAccessor {
 
     @Accessor("timer")
     Timer getTimer();
+
+    @org.spongepowered.asm.mixin.gen.Invoker("func_147121_ag")
+    void offscreen$rightClick();
 }
