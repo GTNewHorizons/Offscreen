@@ -22,6 +22,7 @@ import org.lwjgl.sdl.SDL_Event;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjglx.input.KeyCodes;
 import org.lwjglx.input.Keyboard;
+import org.lwjglx.input.Mouse;
 import org.lwjglx.opengl.ContextGL;
 import org.lwjglx.opengl.Display;
 import org.lwjglx.opengl.DrawableGL;
@@ -32,12 +33,12 @@ import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import com.sbancuz.offscreen.mixins.early.MinecraftAccessor;
-import com.sbancuz.offscreen.window.input.FrameEvent;
-import com.sbancuz.offscreen.window.input.InputRouter;
+import com.sbancuz.offscreen.window.input.HostedInput;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
+import me.eigenraven.lwjgl3ify.api.InputEvents;
 import me.eigenraven.lwjgl3ify.api.Lwjgl3Aware;
 import me.eigenraven.lwjgl3ify.client.MainThreadExec;
 
@@ -57,7 +58,9 @@ public final class Window {
     private final String title;
 
     private final Renderer renderer = new Renderer();
-    private final HostedStack screenStack = new HostedStack();
+    /** The lwjgl input the hosted screens read; SDL events are recorded into it as they are drained. */
+    private final HostedInput input = new HostedInput();
+    private final HostedStack screenStack = new HostedStack(input);
 
     @Getter
     private int pixelWidth = DEFAULT_WIDTH;
@@ -74,7 +77,9 @@ public final class Window {
     @Setter
     private volatile boolean focusState;
 
-    private final FrameEvent frameEvent = new FrameEvent();
+    /** The pointer in GUI coordinates, -1 before it entered the window. */
+    private int mouseX = -1, mouseY = -1;
+    private boolean closeRequested, moveRequested;
 
     public Window(final String title) {
         this.title = title;
@@ -212,14 +217,17 @@ public final class Window {
         if (!renderer.ensureCorrectSize(pixelWidth, pixelHeight)) return;
         if (screenStack.isEmpty()) return;
 
-        drainFrameEvent();
+        input.record(this::drainEvents);
 
-        if (frameEvent.closeRequested) {
+        if (closeRequested) {
+            closeRequested = false;
             destroy();
             return;
         }
 
-        if (pollMoveKey()) {
+        // the move key: the top screen moves to the main window before it sees this frame
+        if (moveRequested) {
+            moveRequested = false;
             Driver.INSTANCE.mainWindow.moveFromWindow(this);
             return;
         }
@@ -229,29 +237,17 @@ public final class Window {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
 
-            screenStack.runScoped(frameEvent, pixelWidth, pixelHeight, s -> {
+            screenStack.runScoped(mouseX, mouseY, pixelWidth, pixelHeight, s -> {
                 if (s.needsResize(guiWidth, guiHeight)) {
                     s.resize(guiWidth, guiHeight);
                 }
-                s.dispatchInput(frameEvent, partialTicks);
-                s.draw(mc, frameEvent.mouseX, frameEvent.mouseY, partialTicks, now);
+                s.draw(mc, mouseX, mouseY, partialTicks, now);
             });
         } finally {
             renderer.endFrame(mc);
         }
 
         renderer.present(sdlPtr, sharedContext, pixelWidth, pixelHeight);
-    }
-
-    /** The move key: the top screen moves to the main window, before it sees this frame. */
-    private boolean pollMoveKey() {
-        for (int i = 0; i < frameEvent.keyCount; i++) {
-            if (!frameEvent.keys[i].pressed() || !Driver.INSTANCE.mainWindow.isMoveKey(frameEvent.keys[i].keyCode()))
-                continue;
-            frameEvent.keyCount = 0;
-            return true;
-        }
-        return false;
     }
 
     public void capture(final long eventPtr) {
@@ -268,9 +264,8 @@ public final class Window {
         ring.free();
     }
 
-    private void drainFrameEvent() {
-        frameEvent.keyCount = 0;
-        frameEvent.text.setLength(0);
+    /** Records the window's SDL events into its lwjgl input, as lwjgl3ify records the main window's. */
+    private void drainEvents() {
         final float scaleX = (float) guiWidth / pixelWidth;
         final float scaleY = (float) guiHeight / pixelHeight;
         while (ringHead != ringTail) {
@@ -281,24 +276,20 @@ public final class Window {
             switch (SDL_CommonEvent.ntype(evAddr)) {
                 case SDLEvents.SDL_EVENT_MOUSE_MOTION -> {
                     final var motion = event.motion();
-                    frameEvent.mouseX = Math.round(motion.x() * scaleX);
-                    frameEvent.mouseY = Math.round(motion.y() * scaleY);
+                    mouseX = Math.round(motion.x() * scaleX);
+                    mouseY = Math.round(motion.y() * scaleY);
+                    input.pointerMoved(mouseX, mouseY, guiWidth, guiHeight);
                 }
-                case SDLEvents.SDL_EVENT_MOUSE_BUTTON_DOWN -> {
-                    frameEvent.pressButton = InputRouter.sdlToGuiButton(
+                case SDLEvents.SDL_EVENT_MOUSE_BUTTON_DOWN, SDLEvents.SDL_EVENT_MOUSE_BUTTON_UP -> input.buttonChanged(
+                    Mouse.sdlToLwjglMouseButton(
                         event.button()
-                            .button());
-                }
-                case SDLEvents.SDL_EVENT_MOUSE_BUTTON_UP -> {
-                    frameEvent.releaseButton = InputRouter.sdlToGuiButton(
-                        event.button()
-                            .button());
-                }
-                case SDLEvents.SDL_EVENT_MOUSE_WHEEL -> {
-                    frameEvent.wheelDelta += event.wheel()
-                        .y();
-                }
-                case SDLEvents.SDL_EVENT_WINDOW_CLOSE_REQUESTED -> frameEvent.closeRequested = true;
+                            .button()),
+                    event.button()
+                        .down());
+                case SDLEvents.SDL_EVENT_MOUSE_WHEEL -> input.wheelScrolled(
+                    event.wheel()
+                        .y());
+                case SDLEvents.SDL_EVENT_WINDOW_CLOSE_REQUESTED -> closeRequested = true;
                 case SDLEvents.SDL_EVENT_KEY_DOWN, SDLEvents.SDL_EVENT_KEY_UP -> {
                     final var key = event.key();
                     if (key.repeat() && !key.down()) break;
@@ -340,10 +331,26 @@ public final class Window {
                                 lwjglKey);
                         }
                     }
-                    if (frameEvent.keyCount < frameEvent.keys.length) {
-                        frameEvent.keys[frameEvent.keyCount++].set(lwjglKey, c, key.down())
-                            .setSdl(sdlKeyCode, sdlScanCode, key.mod());
+                    final int scanKey = KeyCodes.sdlScancodeToLwjgl(sdlScanCode);
+                    if (Driver.INSTANCE.mainWindow.isMoveKey(scanKey)) {
+                        moveRequested |= key.down() && !key.repeat();
+                        break;
                     }
+                    final InputEvents.KeyAction action = !key.down() ? InputEvents.KeyAction.RELEASED
+                        : key.repeat() ? InputEvents.KeyAction.REPEATED : InputEvents.KeyAction.PRESSED;
+                    final Keyboard.KeyState state = !key.down() ? Keyboard.KeyState.RELEASE
+                        : key.repeat() ? Keyboard.KeyState.REPEAT : Keyboard.KeyState.PRESS;
+                    input.keyChanged(
+                        new InputEvents.KeyEvent(
+                            lwjglKey,
+                            scanKey,
+                            sdlKeyCode,
+                            sdlScanCode,
+                            rawKeyCode,
+                            action,
+                            key.mod(),
+                            0L),
+                        new Keyboard.KeyEvent(scanKey, lwjglKey, c, state, System.nanoTime()));
 
                     if (focusState) {
                         final ByteBuffer keyArray = Keyboard.sdlKeyPressedArray;
@@ -355,7 +362,7 @@ public final class Window {
                 case SDLEvents.SDL_EVENT_TEXT_INPUT -> {
                     final String text = event.text()
                         .textString();
-                    if (text != null) frameEvent.text.append(text);
+                    if (text != null) input.textEntered(text);
                 }
                 default -> {}
             }
@@ -442,9 +449,18 @@ public final class Window {
         renderer.setBackground(background);
     }
 
+    /**
+     * The client tick, as {@code Minecraft.runTick} runs the main window's screen: input, then {@code updateScreen}.
+     * Input waits for the tick as in the main window, so a screen polling {@code Mouse.next()} while drawing (vanilla
+     * lists scroll this way) gets the events that arrive between ticks.
+     */
     public void update() {
         if (!isOpen() || screenStack.isEmpty()) return;
-        screenStack.runScoped(HostedScreen::update);
+        screenStack.runScoped(mouseX, mouseY, pixelWidth, pixelHeight, s -> {
+            input.deliverListenerEvents();
+            s.handleInput();
+            s.update();
+        });
     }
 
     /** Disposes every hosted UI top-down. Owners guard against reentry. */

@@ -1,5 +1,7 @@
 package com.sbancuz.offscreen.compat;
 
+import com.cleanroommc.modularui.screen.GuiContainerWrapper;
+import com.cleanroommc.modularui.screen.GuiScreenWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.KeyBinding;
@@ -46,27 +48,18 @@ public final class Mui2Compat {
         UIRegistry.register(ModularScreen.class, screen -> hostFor((ModularScreen) screen));
         // Moves hand over the wrapper GuiScreen, not the ModularScreen.
         UIRegistry.register(
-            com.cleanroommc.modularui.screen.GuiContainerWrapper.class,
+            GuiContainerWrapper.class,
             screen -> hostFor(((IMuiScreen) screen).getScreen()));
         UIRegistry.register(
-            com.cleanroommc.modularui.screen.GuiScreenWrapper.class,
+            GuiScreenWrapper.class,
             screen -> hostFor(((IMuiScreen) screen).getScreen()));
     }
 
     @SideOnly(Side.CLIENT)
     private static HostUI hostFor(final ModularScreen ms) {
-        final HostUI base;
-        if (SyncedMui2UI.isServerBound(ms)) {
-            Offscreen.LOG
-                .warn("[Offscreen] server-bound screen hosted without a session; use the factory open overload");
-            base = new SyncedMui2UI(ms);
-        } else {
-            base = new Mui2UI(ms);
-        }
-        if (ModCompat.NEI.isLoaded()) {
-            return NeiCompat.wrapIfNeeded(base);
-        }
-        return base;
+        if (!SyncedMui2UI.isServerBound(ms)) return new Mui2UI(ms);
+        Offscreen.LOG.warn("[Offscreen] server-bound screen hosted without a session; use the factory open overload");
+        return new SyncedMui2UI(ms);
     }
 
     /** Client: the screen leaves the main window, so MUI2 must stop treating it as the open one. */

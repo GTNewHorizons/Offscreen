@@ -5,7 +5,6 @@ import net.minecraft.client.gui.GuiScreen;
 
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.scope.Scope;
-import com.sbancuz.offscreen.window.input.FrameEvent;
 
 public final class HostedScreen<T extends HostUI> {
 
@@ -71,7 +70,7 @@ public final class HostedScreen<T extends HostUI> {
         screen.update();
     }
 
-    public void dispatchInput(FrameEvent event, float partialTicks) {
-        screen.onInput(event, partialTicks);
+    public void handleInput() {
+        screen.handleInput();
     }
 }

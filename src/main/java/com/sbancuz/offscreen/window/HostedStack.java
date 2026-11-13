@@ -4,6 +4,7 @@ import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
+import com.sbancuz.offscreen.integration.nei.NeiScope;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
@@ -12,18 +13,23 @@ import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.compat.ModCompat;
-import com.sbancuz.offscreen.compat.NeiCompat;
 import com.sbancuz.offscreen.scope.ScopePipeline;
-import com.sbancuz.offscreen.window.input.FrameEvent;
+import com.sbancuz.offscreen.window.input.HostedInput;
 import com.sbancuz.offscreen.window.input.MouseShadow;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
 
-    private final ScopePipeline windowScopes = ScopePipeline.builder()
-        .ifMod(ModCompat.NEI, () -> NeiCompat.windowScope(this::resolveCurrentContainer))
-        .build();
+    private final ScopePipeline windowScopes;
+
+    /** {@code input} is the window's lwjgl input, live while any of its screens runs. */
+    public HostedStack(final HostedInput input) {
+        windowScopes = ScopePipeline.builder()
+            .always(input)
+            .ifMod(ModCompat.NEI, () -> new NeiScope(this::resolveCurrentContainer))
+            .build();
+    }
 
     private @Nullable GuiContainer resolveCurrentContainer() {
         final HostedScreen<?> t = top();
@@ -56,11 +62,8 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         }
     }
 
-    public void runScoped(final Consumer<HostedScreen<?>> action) {
-        runScoped(FrameEvent.EMPTY, -1, -1, action);
-    }
-
-    public void runScoped(final FrameEvent event, final int pixelWidth, final int pixelHeight,
+    /** Runs {@code action} on the top screen in its scopes; the pointer is in GUI coordinates, -1 when unknown. */
+    public void runScoped(final int mouseX, final int mouseY, final int pixelWidth, final int pixelHeight,
         final Consumer<HostedScreen<?>> action) {
         final HostedScreen<?> screen = top();
         final GuiScreen savedScreen = Minecraft.getMinecraft().currentScreen;
@@ -72,7 +75,7 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
                 .enter();
 
             try {
-                MouseShadow.set(event.mouseX, event.mouseY, pixelWidth, pixelHeight);
+                MouseShadow.set(mouseX, mouseY, pixelWidth, pixelHeight);
                 action.accept(screen);
             } catch (final Throwable t) {
                 poisoned = true;
