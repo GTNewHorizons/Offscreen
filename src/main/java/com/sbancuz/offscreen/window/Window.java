@@ -24,9 +24,7 @@ import org.lwjgl.system.MemoryUtil;
 import org.lwjglx.input.KeyCodes;
 import org.lwjglx.input.Keyboard;
 import org.lwjglx.input.Mouse;
-import org.lwjglx.opengl.ContextGL;
 import org.lwjglx.opengl.Display;
-import org.lwjglx.opengl.DrawableGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
@@ -53,12 +51,13 @@ public final class Window {
     @Getter
     private volatile int id;
     private long sdlPtr;
-    private ContextGL sharedContext;
+    private final PresentPath presentPath = PresentPath.create();
 
     @Getter
     private final String title;
 
-    private final Renderer renderer = new Renderer();
+    // Must come after presentPath.
+    private final Renderer renderer = new Renderer(presentPath.colorInternalFormat());
     /** The lwjgl input the hosted screens read; SDL events are recorded into it as they are drained. */
     private final HostedInput input = new HostedInput();
     private final HostedStack screenStack = new HostedStack(input);
@@ -87,45 +86,35 @@ public final class Window {
 
         if (!MainThreadExec.runOnMainThread(() -> SDLInit.SDL_Init(SDLInit.SDL_INIT_VIDEO))) {
             Offscreen.LOG.error("[Offscreen] SDL_Init failed: {}", sdlError());
+            abandonCreation();
             return;
         }
 
-        Display.glContextMutex.lock();
-        try {
-            if (!(Display.getDrawable() instanceof DrawableGL drawable)) {
-                Offscreen.LOG.error(
-                    "[Offscreen] unexpected drawable type {}",
-                    Display.getDrawable()
-                        .getClass());
-                return;
-            }
-            sharedContext = drawable.createSharedContext();
-        } finally {
-            Display.glContextMutex.unlock();
+        if (!presentPath.prepare()) {
+            abandonCreation();
+            return;
         }
 
         restoreMcContext();
 
-        sdlPtr = MainThreadExec.runOnMainThread(
-            () -> SDLVideo.SDL_CreateWindow(
-                title,
-                DEFAULT_WIDTH,
-                DEFAULT_HEIGHT,
-                SDLVideo.SDL_WINDOW_OPENGL | SDLVideo.SDL_WINDOW_RESIZABLE | SDLVideo.SDL_WINDOW_HIDDEN));
+        final long windowFlags = presentPath.windowFlags() | SDLVideo.SDL_WINDOW_RESIZABLE | SDLVideo.SDL_WINDOW_HIDDEN;
+        sdlPtr = MainThreadExec
+            .runOnMainThread(() -> SDLVideo.SDL_CreateWindow(title, DEFAULT_WIDTH, DEFAULT_HEIGHT, windowFlags));
         restoreMcContext();
 
         if (sdlPtr == 0L) {
             Offscreen.LOG.error("[Offscreen] SDL_CreateWindow failed: {}", sdlError());
+            abandonCreation();
             return;
         }
 
         id = SDLVideo.SDL_GetWindowID(sdlPtr);
 
-        if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext.sdlContext)) {
-            Offscreen.LOG.error("[Offscreen] SDL_GL_MakeCurrent failed: {}", sdlError());
+        if (!presentPath.attach(sdlPtr)) {
+            abandonCreation();
             return;
         }
-        SDLVideo.SDL_GL_SetSwapInterval(0);
+        renderer.setFpsCap(presentPath.fpsCap());
         restoreMcContext();
 
         probeDrawableSize();
@@ -149,22 +138,36 @@ public final class Window {
         return sdlPtr != 0L;
     }
 
+    private void abandonCreation() {
+        final long window = sdlPtr;
+        MainThreadExec.runOnMainThread(() -> {
+            presentPath.detach(window);
+            if (window != 0L) SDLVideo.SDL_DestroyWindow(window);
+        });
+        sdlPtr = 0L;
+        freeRing();
+        restoreMcContext();
+    }
+
     public void destroy() {
         if (sdlPtr == 0L) return;
         MainThreadExec.runOnMainThread(() -> { SDLKeyboard.SDL_StopTextInput(sdlPtr); });
         restoreMcContext();
-        renderer.awaitPresentation();
+        presentPath.awaitPresentation();
         renderer.resetGLContext();
         MainThreadExec.runOnMainThread(() -> {
-            sharedContext.destroy();
+            presentPath.detach(sdlPtr);
             SDLVideo.SDL_DestroyWindow(sdlPtr);
         });
-        sharedContext = null;
         sdlPtr = 0L;
         freeRing();
         restoreMcContext();
         Driver.INSTANCE.removeWindow(this);
         disposeStack();
+    }
+
+    void awaitPresentation() {
+        if (isOpen()) presentPath.awaitPresentation();
     }
 
     public static String sdlError() {
@@ -206,7 +209,7 @@ public final class Window {
     }
 
     private void renderFrame() {
-        renderer.awaitPresentation();
+        if (!presentPath.beforeRender()) return;
         probeDrawableSize();
 
         final Minecraft mc = Minecraft.getMinecraft();
@@ -215,6 +218,7 @@ public final class Window {
         guiWidth = resolution.getScaledWidth();
         guiHeight = resolution.getScaledHeight();
 
+        if (!renderer.targetMatches(pixelWidth, pixelHeight)) presentPath.awaitPresentation();
         if (!renderer.ensureCorrectSize(pixelWidth, pixelHeight)) return;
         if (screenStack.isEmpty()) return;
 
@@ -248,7 +252,7 @@ public final class Window {
             renderer.endFrame(mc);
         }
 
-        renderer.present(sdlPtr, sharedContext, pixelWidth, pixelHeight);
+        presentPath.present(sdlPtr, renderer, pixelWidth, pixelHeight);
         destroyIfEmpty();
     }
 

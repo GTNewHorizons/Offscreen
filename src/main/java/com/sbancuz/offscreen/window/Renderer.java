@@ -10,10 +10,6 @@ import org.lwjgl.opengl.EXTFramebufferObject;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL30;
-import org.lwjgl.opengl.GL30C;
-import org.lwjgl.opengl.GL32C;
-import org.lwjgl.sdl.SDLVideo;
-import org.lwjglx.opengl.ContextGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.config.OffscreenConfig;
@@ -26,25 +22,19 @@ public final class Renderer {
     private int targetFps = OffscreenConfig.focusedFps;
     private int step = 1000 / targetFps;
     private long nextFrameMs = 0;
+    private int fpsCap;
+
+    private final int colorInternalFormat;
 
     private int framebuffer;
     private int colorTexture;
     private int depthStencilBuffer;
-    private int presentationFramebuffer;
-    private int presentationTexture;
-    volatile private long presentationFence;
+    private long targetGeneration;
 
     private int bufferWidth = -1;
     private int bufferHeight = -1;
 
     private int savedFbo;
-    private final float[] savedClear = new float[4];
-    private final ByteBuffer maskScratch = ByteBuffer.allocateDirect(4);
-
-    private boolean savedMaskR = true;
-    private boolean savedMaskG = true;
-    private boolean savedMaskB = true;
-    private boolean savedMaskA = true;
 
     private float clearR = 0.08f;
     private float clearG = 0.09f;
@@ -53,6 +43,10 @@ public final class Renderer {
 
     private @Nullable Runnable background;
 
+    public Renderer(final int colorInternalFormat) {
+        this.colorInternalFormat = colorInternalFormat;
+    }
+
     public boolean isTimeToRender() {
         final long now = System.currentTimeMillis();
         if (now < nextFrameMs) return false;
@@ -60,8 +54,13 @@ public final class Renderer {
         return true;
     }
 
+    void setFpsCap(final int cap) {
+        fpsCap = Math.max(cap, 0);
+    }
+
     public void setFocused(boolean focused) {
-        final int newFps = focused ? OffscreenConfig.focusedFps : OffscreenConfig.unfocusedFps;
+        int newFps = focused ? OffscreenConfig.focusedFps : OffscreenConfig.unfocusedFps;
+        if (fpsCap > 0) newFps = Math.min(newFps, fpsCap);
         if (targetFps != newFps) {
             targetFps = newFps;
             step = 1000 / targetFps;
@@ -91,14 +90,17 @@ public final class Renderer {
 
     public void beginFrame(final int width, final int height, final int guiWidth, final int guiHeight) {
         savedFbo = GL11.glGetInteger(EXTFramebufferObject.GL_FRAMEBUFFER_BINDING_EXT);
-        GL11.glGetFloatv(GL11.GL_COLOR_CLEAR_VALUE, savedClear);
-        maskScratch.clear();
-        GL11.glGetBooleanv(GL11.GL_COLOR_WRITEMASK, maskScratch);
-        savedMaskR = maskScratch.get(0) != 0;
-        savedMaskG = maskScratch.get(1) != 0;
-        savedMaskB = maskScratch.get(2) != 0;
-        savedMaskA = maskScratch.get(3) != 0;
+        // Not glGetBooleanv(GL_COLOR_WRITEMASK): Angelica doesn't redirect it, so it crashes on SDL GPU.
+        GL11.glPushAttrib(GL11.GL_COLOR_BUFFER_BIT);
+        try {
+            setUpTarget(width, height, guiWidth, guiHeight);
+        } catch (final RuntimeException | Error e) {
+            restoreMcState();
+            throw e;
+        }
+    }
 
+    private void setUpTarget(final int width, final int height, final int guiWidth, final int guiHeight) {
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebuffer);
         GL11.glViewport(0, 0, width, height);
         GL11.glClearColor(clearR, clearG, clearB, clearA);
@@ -125,76 +127,43 @@ public final class Renderer {
     }
 
     public void endFrame(final Minecraft mc) {
-        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, savedFbo);
+        restoreMcState();
         GL11.glViewport(0, 0, mc.displayWidth, mc.displayHeight);
-        GL11.glColorMask(savedMaskR, savedMaskG, savedMaskB, savedMaskA);
-        GL11.glClearColor(savedClear[0], savedClear[1], savedClear[2], savedClear[3]);
         mc.entityRenderer.setupOverlayRendering();
     }
 
-    public void present(long window, ContextGL context, int pixelWidth, int pixelHeight) {
-        if (framebuffer == 0) return;
-        long rendered = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-        GL11.glFlush();
-        try {
-            if (!SDLVideo.SDL_GL_MakeCurrent(window, context.sdlContext)) {
-                Offscreen.LOG.error("[Offscreen] present MakeCurrent failed");
-                return;
-            }
-            GL32C.glWaitSync(rendered, 0, GL32C.GL_TIMEOUT_IGNORED);
-            blit(pixelWidth, pixelHeight);
-            presentationFence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-            GL11.glFlush();
-
-            if (!SDLVideo.SDL_GL_SwapWindow(window)) {
-                Offscreen.LOG.warn("[Offscreen] SDL_GL_SwapWindow failed");
-            }
-        } finally {
-            GL32C.glDeleteSync(rendered);
-        }
+    private void restoreMcState() {
+        // Rebind first: the popped draw buffer applies to the bound framebuffer.
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, savedFbo);
+        GL11.glPopAttrib();
     }
 
-    void awaitPresentation() {
-        if (presentationFence == 0L) return;
-        GL32C.glWaitSync(presentationFence, 0, GL32C.GL_TIMEOUT_IGNORED);
-        GL32C.glDeleteSync(presentationFence);
-        presentationFence = 0L;
+    boolean hasTarget() {
+        return framebuffer != 0;
     }
 
-    private void blit(int pixelWidth, int pixelHeight) {
-        if (presentationFramebuffer == 0) presentationFramebuffer = GL30C.glGenFramebuffers();
-        GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, presentationFramebuffer);
-        if (presentationTexture != colorTexture) {
-            // Framebuffers belong to a context. Only the color texture is shared with Minecraft.
-            GL30C.glFramebufferTexture2D(
-                GL30C.GL_READ_FRAMEBUFFER,
-                GL30C.GL_COLOR_ATTACHMENT0,
-                GL11.GL_TEXTURE_2D,
-                colorTexture,
-                0);
-            presentationTexture = colorTexture;
-        }
-        GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, 0);
-        final int dw = Math.max(pixelWidth, 1);
-        final int dh = Math.max(pixelHeight, 1);
-        GL11.glViewport(0, 0, dw, dh);
-        GL32C
-            .glBlitFramebuffer(0, 0, bufferWidth, bufferHeight, 0, 0, dw, dh, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_LINEAR);
-        int err = GL11.glGetError();
-        if (err != GL11.GL_NO_ERROR) {
-            Offscreen.LOG.warn(
-                "[Offscreen] present blit GL error 0x{} fbo={} src={}x{} dst={}x{}",
-                Integer.toHexString(err),
-                framebuffer,
-                bufferWidth,
-                bufferHeight,
-                dw,
-                dh);
-            GL11.glClearColor(1f, 0f, 1f, 1f);
-            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
-        }
-        GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, 0);
-        GL11.glFlush();
+    boolean targetMatches(final int width, final int height) {
+        return framebuffer != 0 && bufferWidth == width && bufferHeight == height;
+    }
+
+    int framebuffer() {
+        return framebuffer;
+    }
+
+    int colorTexture() {
+        return colorTexture;
+    }
+
+    int targetWidth() {
+        return bufferWidth;
+    }
+
+    int targetHeight() {
+        return bufferHeight;
+    }
+
+    long targetGeneration() {
+        return targetGeneration;
     }
 
     public boolean ensureCorrectSize(int width, int height) {
@@ -210,7 +179,7 @@ public final class Renderer {
         GL11.glTexImage2D(
             GL11.GL_TEXTURE_2D,
             0,
-            GL30.GL_SRGB8_ALPHA8,
+            colorInternalFormat,
             width,
             height,
             0,
@@ -251,7 +220,7 @@ public final class Renderer {
     }
 
     void resetGLContext() {
-        presentationTexture = 0;
+        targetGeneration++;
         if (framebuffer != 0) {
             GL30.glDeleteFramebuffers(framebuffer);
             framebuffer = 0;

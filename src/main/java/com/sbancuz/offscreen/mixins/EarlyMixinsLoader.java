@@ -13,6 +13,8 @@ import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
 @IFMLLoadingPlugin.MCVersion("1.7.10")
 public class EarlyMixinsLoader implements IFMLLoadingPlugin, IEarlyMixinLoader {
 
+    private static final String ANGELICA_COREMOD = "com.gtnewhorizons.angelica.loading.AngelicaTweaker";
+
     @Override
     public String[] getASMTransformerClass() {
         return null;
@@ -52,6 +54,13 @@ public class EarlyMixinsLoader implements IFMLLoadingPlugin, IEarlyMixinLoader {
             mixins.add("GuiScreenBackground");
             mixins.add("EntityRendererFocus");
             mixins.add("MinecraftAccessor");
+
+            // Not in @Mod dependencies: dedicated servers run without Angelica.
+            if (!loadedCoreMods.contains(ANGELICA_COREMOD)) {
+                throw new IllegalStateException("Offscreen requires Angelica on the client");
+            }
+            mixins.add("SDLGPURenderBackendAccessor");
+            mixins.add("MinecraftFrameBoundary");
             mixins.add("MinecraftMixin");
         }
 
