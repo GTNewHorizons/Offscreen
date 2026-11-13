@@ -32,8 +32,16 @@ public class LateMixinsLoader implements ILateMixinLoader {
         if (loadedMods.contains(ModCompat.MODULAR_UI2.modId())) {
             mixins.add("ClientScreenHandlerAccessor");
             mixins.add("GuiManagerOffscreenMixin");
-            mixins.add("ModularNetworkOffscreenMixin");
+            mixins.add("ModularNetworkSideInvoker");
+            mixins.add("ClientScreenHandlerMixin");
+            mixins.add("NetworkHandlerMixin");
+
+            // the container multiplexer, and the render state of hosted screens
+            mixins.add("Mui2ServerCloseMixin");
+            mixins.add("OverlayStackAccessor");
+            mixins.add("StencilAccessor");
         }
+
         if (loadedMods.contains(ModCompat.NEI.modId())) {
             mixins.add("BookmarkPanelAccessor");
             mixins.add("GuiDrawMixin");
