@@ -4,135 +4,116 @@ import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
 
 import com.sbancuz.offscreen.Offscreen;
-import com.sbancuz.offscreen.api.HostUI;
-import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.compat.ModCompat;
 import com.sbancuz.offscreen.compat.NeiCompat;
+import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.Scope;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.window.input.FrameEvent;
 import com.sbancuz.offscreen.window.input.MouseShadow;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
+/**
+ * The screens of one hosted window, bottom to top. Every change goes through the container
+ * screen routing of the {@link ServerContainerMultiplexer}; this class only keeps the list and runs
+ * scoped code for one entry.
+ */
 public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
 
     private final ScopePipeline windowScopes = ScopePipeline.builder()
         .ifMod(ModCompat.NEI, () -> NeiCompat.windowScope(this::resolveCurrentContainer))
         .build();
 
+    private @Nullable HostedScreen<?> running;
+
     private @Nullable GuiContainer resolveCurrentContainer() {
-        final HostedScreen<?> t = top();
+        final HostedScreen<?> t = running != null ? running : isEmpty() ? null : top();
         if (t == null) return null;
-        final GuiScreen gs = t.getGuiScreen();
+        final GuiScreen gs = t.screen();
         return gs instanceof GuiContainer gc ? gc : null;
     }
 
-    @Override
-    public void clear() {
-        windowScopes.restore();
-        super.clear();
-    }
-
     public @Nullable HostedScreen<?> findEntry(final GuiScreen screen) {
-        for (HostedScreen<?> hostedScreen : this) {
-            if (hostedScreen.getGuiScreen() == screen) return hostedScreen;
+        for (final HostedScreen<?> hostedScreen : this) {
+            if (hostedScreen.screen() == screen) return hostedScreen;
         }
         return null;
     }
 
-    public void popTo(final HostedScreen<?> target) {
-        while (top() != target && size() > 1) {
-            pop().dispose();
+    /** The entry {@code entry} hangs on: the nearest bound entry at or below it, else itself. */
+    public HostedScreen<?> boundBaseOf(final HostedScreen<?> entry) {
+        for (int i = indexOf(entry); i >= 0; i--) {
+            final HostedScreen<?> e = get(i);
+            if (ServerContainerMultiplexer.INSTANCE.containerOf(e.screen()) != null) return e;
         }
+        return entry;
     }
 
+    public void pushEntry(final HostedScreen<?> e) {
+        e.requestResize();
+        add(e);
+    }
+
+    /** Runs {@code action} for the top entry, in its scope and for its view. */
     public void runScoped(final Consumer<HostedScreen<?>> action) {
-        runScoped(FrameEvent.EMPTY, -1, -1, action);
+        if (isEmpty()) return;
+        runScoped(FrameEvent.EMPTY, -1, -1, top(), true, action);
+    }
+
+    /** Runs {@code action} for {@code entry}, which need not be in the stack any more (disposal). */
+    public void runScopedOn(final HostedScreen<?> entry, final boolean applyDeferred,
+        final Consumer<HostedScreen<?>> action) {
+        runScoped(FrameEvent.EMPTY, -1, -1, entry, applyDeferred, action);
     }
 
     public void runScoped(final FrameEvent event, final int pixelWidth, final int pixelHeight,
-        final Consumer<HostedScreen<?>> action) {
-        final HostedScreen<?> screen = top();
-        final GuiScreen savedScreen = Minecraft.getMinecraft().currentScreen;
-        boolean poisoned = false;
+        final HostedScreen<?> entry, final boolean applyDeferred, final Consumer<HostedScreen<?>> action) {
+        final HostedScreen<?> prevRunning = running;
+        running = entry;
 
-        windowScopes.enter();
         try {
-            screen.scope()
-                .enter();
+            ServerContainerMultiplexer.INSTANCE.contexts
+                .runInHostedView(entry, () -> runScopes(event, pixelWidth, pixelHeight, entry, action), applyDeferred);
+        } finally {
+            running = prevRunning;
+        }
+    }
 
-            try {
-                MouseShadow.set(event.mouseX, event.mouseY, pixelWidth, pixelHeight);
-                action.accept(screen);
-            } catch (final Throwable t) {
-                poisoned = true;
-                Offscreen.LOG.error("[Offscreen] scoped action failed", t);
-            } finally {
-                if (!poisoned) {
-                    try {
-                        handleScreenChange(savedScreen);
-                    } catch (final Throwable t) {
-                        Offscreen.LOG.error("[Offscreen] screen-change handling failed", t);
-                    }
-                }
-                MouseShadow.clear();
-                screen.scope()
-                    .restore();
-            }
+    /** Every scope is entered inside the try whose finally restores it. */
+    private void runScopes(final FrameEvent event, final int pixelWidth, final int pixelHeight,
+        final HostedScreen<?> entry, final Consumer<HostedScreen<?>> action) {
+        try {
+            windowScopes.enter();
+            runEntryScope(event, pixelWidth, pixelHeight, entry, action);
+        } catch (final Throwable t) {
+            Offscreen.LOG.error("[Offscreen] scoped action failed", t);
         } finally {
             windowScopes.restore();
         }
     }
 
-    private void handleScreenChange(final GuiScreen prevTop) {
-        final Minecraft mc = Minecraft.getMinecraft();
-        final GuiScreen now = mc.currentScreen;
-        if (now == prevTop) return;
-
-        final HostedScreen<?> match = findEntry(now);
-        if (match != null) {
-            popTo(match);
-            match.requestResize();
-            return;
+    /** The entry's own scope and the mouse shadow, inside the window scopes. */
+    private void runEntryScope(final FrameEvent event, final int pixelWidth, final int pixelHeight,
+        final HostedScreen<?> entry, final Consumer<HostedScreen<?>> action) {
+        final Scope own = entry.scope();
+        try {
+            own.enter();
+            MouseShadow.set(event.mouseX, event.mouseY, pixelWidth, pixelHeight);
+            action.accept(entry);
+        } finally {
+            MouseShadow.clear();
+            own.restore();
         }
-
-        if (now == null) {
-            if (size() > 1) {
-                final HostedScreen<?> t = pop();
-                Offscreen.LOG.info("[Offscreen] pop {} (close-to-null, depth {})", t, size());
-                t.dispose();
-                top().requestResize();
-            }
-            mc.currentScreen = top().getGuiScreen();
-            return;
-        }
-
-        pushStolen(now);
     }
 
-    public void pushStolen(final GuiScreen stolen) {
-        final HostUI ui = UIRegistry.resolve(stolen);
-        if (ui == null) {
-            Offscreen.LOG.warn(
-                "[Offscreen] no UI factory for stolen screen: {}",
-                stolen.getClass()
-                    .getSimpleName());
-            return;
-        }
-        final HostedScreen<?> entry = new HostedScreen<>(ui);
-        entry.requestResize();
-        push(entry);
-        Offscreen.LOG.info(
-            "[Offscreen] STEAL {} (adapter: {}, depth {})",
-            stolen.getClass()
-                .getSimpleName(),
-            ui.getClass()
-                .getSimpleName(),
-            size());
+    /** Drops every entry without telling the multiplexer (world unload, window destruction). */
+    void disposeAll() {
+        while (!isEmpty()) pop().dispose();
+        windowScopes.restore();
     }
 }

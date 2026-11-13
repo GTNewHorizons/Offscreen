@@ -8,9 +8,6 @@ import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.mixins.early.GuiContainerAccessor;
 import com.sbancuz.offscreen.mixins.early.GuiScreenAccessor;
-import com.sbancuz.offscreen.scope.Scope;
-import com.sbancuz.offscreen.scope.ScopePipeline;
-import com.sbancuz.offscreen.scope.ScreenScope;
 import com.sbancuz.offscreen.window.input.KeyEvent;
 
 import me.eigenraven.lwjgl3ify.api.InputEvents;
@@ -18,18 +15,9 @@ import me.eigenraven.lwjgl3ify.api.InputEvents;
 public class VanillaUI implements HostUI {
 
     private final GuiScreen screen;
-    private final Scope scope;
 
     public VanillaUI(GuiScreen screen) {
         this.screen = screen;
-        this.scope = ScopePipeline.builder()
-            .always(new ScreenScope(this::getGuiScreen))
-            .build();
-    }
-
-    @Override
-    public Scope scope() {
-        return scope;
     }
 
     @Override

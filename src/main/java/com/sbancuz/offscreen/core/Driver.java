@@ -8,6 +8,7 @@ import java.util.function.Predicate;
 
 import net.minecraft.client.Minecraft;
 
+import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.window.Window;
 import com.sbancuz.offscreen.window.input.InputRouter;
 
@@ -32,15 +33,29 @@ public class Driver {
     @SubscribeEvent
     public void onClientTick(final TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        if (Minecraft.getMinecraft().theWorld == null && !windows.isEmpty()) {
-            closeAll();
-            SessionRegistry.INSTANCE.disposeAll();
+        if (Minecraft.getMinecraft().theWorld == null) {
+            // disconnect: every container and view is dropped without packets.
+            ServerContainerMultiplexer.INSTANCE.tick();
+            if (!windows.isEmpty()) closeAll();
             return;
         }
+        ServerContainerMultiplexer.INSTANCE.tick();
         for (final Window w : windows.values()) {
             w.update();
         }
-        SessionRegistry.INSTANCE.tickAll();
+    }
+
+    /** Whether {@code Keyboard.sdlKeyPressedArray} is currently a hosted window's shadow copy. */
+    public boolean keyShadowActive() {
+        return router.shadowActive();
+    }
+
+    public boolean ownsKeyShadow(final Window w) {
+        return router.ownsShadow(w);
+    }
+
+    public void releaseKeyShadow(final Window w) {
+        router.releaseIfOwner(w);
     }
 
     public void trackWindow(final Window window) {
