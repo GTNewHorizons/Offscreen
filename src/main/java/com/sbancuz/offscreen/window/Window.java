@@ -7,6 +7,7 @@ import java.nio.IntBuffer;
 import javax.annotation.Nullable;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.inventory.GuiInventory;
 
@@ -27,7 +28,9 @@ import org.lwjglx.opengl.DrawableGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
+import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.core.Driver;
+import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import com.sbancuz.offscreen.mixins.early.MinecraftAccessor;
 import com.sbancuz.offscreen.window.input.FrameEvent;
 import com.sbancuz.offscreen.window.input.InputRouter;
@@ -168,6 +171,22 @@ public final class Window {
             .makeCurrent();
     }
 
+    public HostedStack stack() {
+        return screenStack;
+    }
+
+    /** Pushes the entry for {@code s}; every screen has a host UI, vanilla's at least. */
+    public HostedScreen<?> pushScreen(final GuiScreen s) {
+        final HostedScreen<?> e = new HostedScreen<>(hostFor(s));
+        screenStack.pushEntry(e);
+        return e;
+    }
+
+    private HostUI hostFor(final GuiScreen s) {
+        if (UIRegistry.resolve(s) instanceof HostUI ui) return ui;
+        return new VanillaUI(s);
+    }
+
     public void tryRenderFrame() {
         if (!isOpen()) return;
         renderer.setFocused(focusState);
@@ -200,6 +219,11 @@ public final class Window {
             return;
         }
 
+        if (pollMoveKey()) {
+            Driver.INSTANCE.mainWindow.moveFromWindow(this);
+            return;
+        }
+
         renderer.beginFrame(pixelWidth, pixelHeight, guiWidth, guiHeight);
         try {
             final long now = System.currentTimeMillis();
@@ -217,6 +241,17 @@ public final class Window {
         }
 
         renderer.present(sdlPtr, sharedContext, pixelWidth, pixelHeight);
+    }
+
+    /** The move key: the top screen moves to the main window, before it sees this frame. */
+    private boolean pollMoveKey() {
+        for (int i = 0; i < frameEvent.keyCount; i++) {
+            if (!frameEvent.keys[i].pressed() || !Driver.INSTANCE.mainWindow.isMoveKey(frameEvent.keys[i].keyCode()))
+                continue;
+            frameEvent.keyCount = 0;
+            return true;
+        }
+        return false;
     }
 
     public void capture(final long eventPtr) {

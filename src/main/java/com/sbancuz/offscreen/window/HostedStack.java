@@ -45,6 +45,11 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         return null;
     }
 
+    public void pushEntry(final HostedScreen<?> e) {
+        e.requestResize();
+        add(e);
+    }
+
     public void popTo(final HostedScreen<?> target) {
         while (top() != target && size() > 1) {
             pop().dispose();

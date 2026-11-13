@@ -26,6 +26,7 @@ public class ClientProxy extends CommonProxy {
         FMLCommonHandler.instance()
             .bus()
             .register(Driver.INSTANCE);
+        Driver.INSTANCE.mainWindow.register();
 
         UIRegistry.register(GuiScreen.class, screen -> {
             final HostUI base = new VanillaUI((GuiScreen) screen);
