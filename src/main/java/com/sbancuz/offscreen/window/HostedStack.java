@@ -4,7 +4,6 @@ import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
-import com.sbancuz.offscreen.integration.nei.NeiScope;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
@@ -13,6 +12,7 @@ import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.compat.ModCompat;
+import com.sbancuz.offscreen.integration.nei.NeiScope;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.window.input.HostedInput;
 import com.sbancuz.offscreen.window.input.MouseShadow;

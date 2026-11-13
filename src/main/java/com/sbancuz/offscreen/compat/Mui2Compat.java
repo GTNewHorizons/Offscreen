@@ -1,7 +1,5 @@
 package com.sbancuz.offscreen.compat;
 
-import com.cleanroommc.modularui.screen.GuiContainerWrapper;
-import com.cleanroommc.modularui.screen.GuiScreenWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.KeyBinding;
@@ -9,6 +7,8 @@ import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.input.Keyboard;
 
 import com.cleanroommc.modularui.api.IMuiScreen;
+import com.cleanroommc.modularui.screen.GuiContainerWrapper;
+import com.cleanroommc.modularui.screen.GuiScreenWrapper;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
@@ -47,12 +47,8 @@ public final class Mui2Compat {
     public static void registerClient() {
         UIRegistry.register(ModularScreen.class, screen -> hostFor((ModularScreen) screen));
         // Moves hand over the wrapper GuiScreen, not the ModularScreen.
-        UIRegistry.register(
-            GuiContainerWrapper.class,
-            screen -> hostFor(((IMuiScreen) screen).getScreen()));
-        UIRegistry.register(
-            GuiScreenWrapper.class,
-            screen -> hostFor(((IMuiScreen) screen).getScreen()));
+        UIRegistry.register(GuiContainerWrapper.class, screen -> hostFor(((IMuiScreen) screen).getScreen()));
+        UIRegistry.register(GuiScreenWrapper.class, screen -> hostFor(((IMuiScreen) screen).getScreen()));
     }
 
     @SideOnly(Side.CLIENT)

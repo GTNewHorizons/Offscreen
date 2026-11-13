@@ -456,6 +456,8 @@ public final class Window {
      */
     public void update() {
         if (!isOpen() || screenStack.isEmpty()) return;
+        // lwjgl3ify pumps SDL at the end of the frame, so this tick sees the window's events as the main one sees its
+        input.record(this::drainEvents);
         screenStack.runScoped(mouseX, mouseY, pixelWidth, pixelHeight, s -> {
             input.deliverListenerEvents();
             s.handleInput();
