@@ -66,7 +66,8 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
      * throughout, scopes included, so code sizing itself from it ({@code ScaledResolution}, scissor math, vanilla's
      * mouse conversion) sizes itself for this window.
      */
-    public void runScoped(final int pixelWidth, final int pixelHeight, final Consumer<HostedScreen<?>> action) {
+    public void runScoped(final int pixelWidth, final int pixelHeight,
+        final Consumer<HostedScreen<? extends HostUI>> action) {
         final Minecraft mc = Minecraft.getMinecraft();
         final HostedScreen<?> screen = top();
         final GuiScreen savedScreen = mc.currentScreen;
@@ -103,6 +104,21 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         }
     }
 
+    /**
+     * Closes the top screen as the player closing it would: its {@code onGuiClosed} inside its scope, then disposal.
+     */
+    public void closeTop(final int pixelWidth, final int pixelHeight) {
+        final HostedScreen<?> closing = top();
+        runScoped(
+            pixelWidth,
+            pixelHeight,
+            s -> s.getGuiScreen()
+                .onGuiClosed());
+        if (!remove(closing)) return; // it closed itself meanwhile
+        closing.dispose();
+        if (!isEmpty()) top().requestResize();
+    }
+
     private void handleScreenChange(final GuiScreen prevTop) {
         final Minecraft mc = Minecraft.getMinecraft();
         final GuiScreen now = mc.currentScreen;
@@ -116,12 +132,13 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         }
 
         if (now == null) {
-            if (size() > 1) {
-                final HostedScreen<?> t = pop();
-                Offscreen.LOG.info("[Offscreen] pop {} (close-to-null, depth {})", t, size());
-                t.dispose();
-                top().requestResize();
-            }
+            // the screen closed itself (displayGuiScreen already ran its onGuiClosed): the one below shows, or the
+            // window, now empty, is destroyed by its owner after the run
+            final HostedScreen<?> closed = pop();
+            Offscreen.LOG.info("[Offscreen] pop {} (close-to-null, depth {})", closed, size());
+            closed.dispose();
+            if (isEmpty()) return;
+            top().requestResize();
             mc.currentScreen = top().getGuiScreen();
             return;
         }

@@ -3,6 +3,7 @@ package com.sbancuz.offscreen.window;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
+import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
@@ -221,7 +222,7 @@ public final class Window {
 
         if (closeRequested) {
             closeRequested = false;
-            destroy();
+            close();
             return;
         }
 
@@ -248,6 +249,37 @@ public final class Window {
         }
 
         renderer.present(sdlPtr, sharedContext, pixelWidth, pixelHeight);
+        destroyIfEmpty();
+    }
+
+    /** The close button: every screen closes top-down as if the player closed it, then the window goes. */
+    public void close() {
+        for (int remaining = screenStack.size(); remaining > 0 && !screenStack.isEmpty(); remaining--) {
+            screenStack.closeTop(pixelWidth, pixelHeight);
+        }
+        destroy();
+    }
+
+    /**
+     * Runs {@code action} as the window's own screen runs: inside its scopes, so {@code mc.currentScreen}, lwjgl's
+     * input and the display size are the window's. For code reaching a hosted screen from outside it, such as
+     * commands, keybinds or links. Client thread only; false when the window shows nothing.
+     */
+    public boolean runInScope(final Consumer<HostUI> action) {
+        if (!isOpen() || screenStack.isEmpty()) return false;
+        screenStack.runScoped(pixelWidth, pixelHeight, s -> action.accept(s.screen()));
+        destroyIfEmpty();
+        return true;
+    }
+
+    /** A window whose last screen closed itself goes, as the main window shows the game again. */
+    private void destroyIfEmpty() {
+        if (isOpen() && screenStack.isEmpty()) destroy();
+    }
+
+    /** Whether the window has keyboard focus. */
+    public boolean isFocused() {
+        return focusState;
     }
 
     public void capture(final long eventPtr) {
@@ -290,6 +322,8 @@ public final class Window {
                     event.wheel()
                         .y());
                 case SDLEvents.SDL_EVENT_WINDOW_CLOSE_REQUESTED -> closeRequested = true;
+                // SDL releases the held keys itself; a drag would never see its button come up
+                case SDLEvents.SDL_EVENT_WINDOW_FOCUS_LOST -> input.releaseButtons();
                 case SDLEvents.SDL_EVENT_KEY_DOWN, SDLEvents.SDL_EVENT_KEY_UP -> {
                     final var key = event.key();
                     if (key.repeat() && !key.down()) break;
@@ -463,6 +497,7 @@ public final class Window {
             s.handleInput();
             s.update();
         });
+        destroyIfEmpty();
     }
 
     /** Disposes every hosted UI top-down. Owners guard against reentry. */

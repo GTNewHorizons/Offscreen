@@ -89,6 +89,19 @@ public final class HostedInput implements Scope {
         Mouse.addButtonEvent(lwjglButton, down);
     }
 
+    /** Releases the buttons still held, as if they came up where the pointer is. */
+    public void releaseButtons() {
+        if (MOUSE_FIELDS == null) return;
+        int held = heldButtons;
+        while (held != 0) {
+            final int bit = Integer.lowestOneBit(held);
+            held &= ~bit;
+            buttonChanged(Mouse.sdlToLwjglMouseButton((byte) (Integer.numberOfTrailingZeros(bit) + 1)), false);
+        }
+        heldButtons = 0;
+        Mouse.sdlMouseButtonFlags = 0;
+    }
+
     /** Raw SDL wheel delta; lwjgl3ify applies the player's scroll settings. */
     public void wheelScrolled(final float delta) {
         if (MOUSE_FIELDS == null || delta == 0f) return;
