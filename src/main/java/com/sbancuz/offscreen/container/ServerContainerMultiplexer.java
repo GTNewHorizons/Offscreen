@@ -373,9 +373,21 @@ public final class ServerContainerMultiplexer {
         probes.sendTracked(c, ServerProbes.NO_CAUSE, onAnswer, this::resetToPlayerInventory);
     }
 
-    /** A hosted view sent packets that may open a GUI: what opens goes to it until this probe is answered. */
+    /** Places screens the server opens in reply to a hosted view in that view's window. */
     public void attributeArrivalsTo(final HostedScreen<?> v) {
-        if (knowsServerState()) probes.askIfOpen(active.windowId, v, ServerProbes.IGNORE, ServerProbes.NOTHING);
+        if (!knowsServerState()) return;
+        if (probes.barrierSupported()) {
+            probes.attributeArrivalsTo(v);
+            return;
+        }
+
+        final boolean wait = isIdle();
+        if (wait) phase = Phase.WAITING_FOR_SERVER;
+        probes.resync(
+            active.windowId,
+            v,
+            () -> { if (wait) becomeIdle(); },
+            wait ? this::resetToPlayerInventory : ServerProbes.NOTHING);
     }
 
     /** A probe or barrier was answered: the watchdog sees progress. */

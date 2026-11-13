@@ -7,6 +7,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.play.client.C0EPacketClickWindow;
@@ -33,14 +35,16 @@ public final class ServerProbes {
     private record PendingProbe(int windowId, short tid, long seq, int epoch, ArrivalCause cause,
         Consumer<Boolean> onAnswer, Runnable onNever) {}
 
+    private record PendingBarrier(long seq, int epoch, @Nullable ArrivalTarget target) {}
+
     private final ServerContainerMultiplexer multiplexer;
     private final List<PendingProbe> pending = new ArrayList<>();
     /** Rejected probes waiting for the S2F(-1) that ends the server's resync. */
     private final ArrayDeque<PendingProbe> resync = new ArrayDeque<>();
     /**
-     * Outstanding C14 in send order: the sequence number of a multiplexer barrier, -1 for the user's.
+     * Outstanding C14 in send order, including user requests with sequence -1.
      */
-    private final Queue<Long> c14 = new ConcurrentLinkedQueue<>();
+    private final Queue<PendingBarrier> c14 = new ConcurrentLinkedQueue<>();
     /** The server does not answer the barrier. */
     private boolean barrierUnsupported;
     private long seq;
@@ -94,13 +98,23 @@ public final class ServerProbes {
 
     /** Its answer proves that every older probe still pending was not answered. */
     void sendBarrier() {
-        if (barrierSupported()) multiplexer.sendAsMultiplexer(new C14PacketTabComplete(BARRIER_TEXT));
+        sendBarrier(null);
     }
 
-    /** A C14 is sent; a multiplexer barrier gets a sequence number, the user's does not. */
+    /** Attributes replies before the barrier to this view without running a server inventory click. */
+    void attributeArrivalsTo(final ArrivalTarget target) {
+        sendBarrier(target);
+    }
+
+    private void sendBarrier(@Nullable final ArrivalTarget target) {
+        if (!barrierSupported()) return;
+        c14.add(new PendingBarrier(++seq, epoch, target));
+        multiplexer.sendAsMultiplexer(new C14PacketTabComplete(BARRIER_TEXT));
+    }
+
+    /** Records user C14 requests to identify user tab-complete replies separately from barrier replies. */
     public void recordTabComplete(final boolean fromMultiplexer) {
-        if (fromMultiplexer) c14.add(++seq);
-        else c14.add(-1L);
+        if (!fromMultiplexer) c14.add(new PendingBarrier(-1, epoch, null));
     }
 
     /** {@code ifOpen} when the probe is answered, {@code ifNotOpen} when the barrier's answer comes first. */
@@ -116,11 +130,16 @@ public final class ServerProbes {
             return;
         }
 
+        resync(w, NO_CAUSE, done, onNever);
+    }
+
+    /** Refreshes the window and attributes server-opened screens until the refresh completes. */
+    void resync(final int w, final ArrivalCause cause, final Runnable done, final Runnable onNever) {
         // the server rejects a click with a stack it does not see there, and resends the window
         final ItemStack wrong = new ItemStack(Blocks.stone);
         sendTracked(
             new C0EPacketClickWindow(w, -999, 0, 4, wrong, multiplexer.nextTransactionId(w)),
-            NO_CAUSE,
+            cause,
             ok -> done.run(),
             onNever);
     }
@@ -135,7 +154,7 @@ public final class ServerProbes {
 
         // a barrier still recorded when the probe is answered was never answered
         askIfOpen(0, ok -> {
-            barrierUnsupported = c14.remove(barrier);
+            barrierUnsupported = c14.removeIf(e -> e.seq == barrier);
             if (barrierUnsupported) ServerContainerMultiplexer.LOG
                 .warn("[Containers] the server does not answer the barrier; disabled for this session");
             done.run();
@@ -169,9 +188,9 @@ public final class ServerProbes {
 
     /** An S3A. Returns true when it answers a barrier of ours; then it is consumed. */
     public boolean onTabCompleteAnswer() {
-        final Long head = c14.poll();
-        if (head == null || head < 0) return false;
-        neverAnswered(head);
+        final PendingBarrier head = c14.poll();
+        if (head == null || head.seq < 0) return false;
+        neverAnswered(head.seq);
         return true;
     }
 
@@ -202,8 +221,22 @@ public final class ServerProbes {
 
     /** The oldest unanswered placement that can still take an arrival; the main window without one. */
     ArrivalTarget pendingArrivalTarget() {
-        for (final PendingProbe e : pending) if (e.cause instanceof ArrivalTarget p && p.canPlace()) return p;
-        return multiplexer.mainWindow;
+        ArrivalTarget target = multiplexer.mainWindow;
+        long first = Long.MAX_VALUE;
+        for (final PendingProbe e : pending) {
+            if (e.cause instanceof ArrivalTarget p && p.canPlace()) {
+                target = p;
+                first = e.seq;
+                break;
+            }
+        }
+        for (final PendingBarrier e : c14) {
+            if (e.epoch == epoch && e.seq >= 0 && e.seq < first && e.target != null && e.target.canPlace()) {
+                target = e.target;
+                first = e.seq;
+            }
+        }
+        return target;
     }
 
     /** A container opened: probes of other windows can no longer be answered and cause nothing. */

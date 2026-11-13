@@ -84,7 +84,7 @@ public final class ContextStack {
         final ViewContext run = new ViewContext(multiplexer, entry);
         run(run, () -> globals.runWith(entry.screen(), entry.containerForGlobals(), body));
 
-        // what the server opens before this probe is answered was caused by this view
+        // Replies before the ordering confirmation belong to this view
         if (run.passedServerDependentTraffic()) multiplexer.attributeArrivalsTo(entry);
         if (applyDeferred) run.applyAfterRun();
     }
