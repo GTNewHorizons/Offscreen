@@ -21,21 +21,34 @@ import com.sbancuz.offscreen.container.ServerContainer;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.container.ServerProbes;
 import com.sbancuz.offscreen.container.reopen.OpeningInteraction;
+import com.sbancuz.offscreen.scope.Scope;
 
 import cpw.mods.fml.common.network.internal.FMLProxyPacket;
 
 /**
- * Who the running code acts for. Each overridable method is a question a hook asks; most defer
- * to the enclosing context. What an outbound packet may do follows from the answers.
+ * The scope of a run: who the running code acts for. It is the innermost context from {@link #enter} to
+ * {@link #restore}; a context whose code must see another screen has Minecraft's GUI globals lent for as long.
+ * Each overridable method is a question a hook asks; most defer to the enclosing context. What an outbound
+ * packet may do follows from the answers.
  */
-public abstract class ExecutionContext {
+public abstract class ExecutionContext implements Scope {
 
     protected final ServerContainerMultiplexer multiplexer;
-    /** The enclosing frame, set by {@link ContextStack} when the run starts. */
+    /** The enclosing context, set by {@link ContextStack} when the run starts. */
     ExecutionContext enclosing;
 
     protected ExecutionContext(final ServerContainerMultiplexer multiplexer) {
         this.multiplexer = multiplexer;
+    }
+
+    @Override
+    public void enter() {
+        multiplexer.contexts.push(this);
+    }
+
+    @Override
+    public void restore() {
+        multiplexer.contexts.pop(this);
     }
 
     /** Code here acts for the view of the server's open container. */

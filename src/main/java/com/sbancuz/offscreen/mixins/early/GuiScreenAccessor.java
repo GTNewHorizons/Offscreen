@@ -5,7 +5,6 @@ import java.io.IOException;
 import net.minecraft.client.gui.GuiScreen;
 
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(GuiScreen.class)
@@ -16,12 +15,6 @@ public interface GuiScreenAccessor {
 
     @Invoker("mouseMovedOrUp")
     void invokeMouseMovedOrUp(int mouseX, int mouseY, int mouseButton);
-
-    @Accessor("eventButton")
-    void offscreen$setEventButton(int button);
-
-    @Accessor("lastMouseEvent")
-    void offscreen$setLastMouseEvent(long time);
 
     @Invoker("keyTyped")
     void invokeKeyTyped(char typedChar, int keyCode) throws IOException;

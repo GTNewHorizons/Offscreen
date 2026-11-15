@@ -4,32 +4,50 @@ import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.inventory.GuiContainer;
 
 import com.sbancuz.offscreen.Offscreen;
+import com.sbancuz.offscreen.api.HostUI;
+import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.compat.ModCompat;
-import com.sbancuz.offscreen.compat.NeiCompat;
+import com.sbancuz.offscreen.container.ServerContainer;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
-import com.sbancuz.offscreen.scope.Scope;
+import com.sbancuz.offscreen.container.ServerProbes;
+import com.sbancuz.offscreen.container.context.HostedViewContext;
+import com.sbancuz.offscreen.core.Driver;
+import com.sbancuz.offscreen.integration.nei.NeiScope;
+import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import com.sbancuz.offscreen.scope.ScopePipeline;
-import com.sbancuz.offscreen.window.input.FrameEvent;
-import com.sbancuz.offscreen.window.input.MouseShadow;
+import com.sbancuz.offscreen.window.input.HostedInput;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 /**
- * The screens of one hosted window, bottom to top. Every change goes through the container
- * screen routing of the {@link ServerContainerMultiplexer}; this class only keeps the list and runs
- * scoped code for one entry.
+ * The screens of one hosted window, bottom to top: a screen its GUI opens is pushed over it, and closing it shows
+ * the one below again. Every change to the stack is made here, and so is every run of an entry's code.
  */
 public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
 
-    private final ScopePipeline windowScopes = ScopePipeline.builder()
-        .ifMod(ModCompat.NEI, () -> NeiCompat.windowScope(this::resolveCurrentContainer))
-        .build();
+    private final ServerContainerMultiplexer multiplexer = ServerContainerMultiplexer.INSTANCE;
+    private final Window window;
+    private final ScopePipeline windowScopes;
 
+    /** The entry whose code runs now. */
     private @Nullable HostedScreen<?> running;
+    /** The last entry was removed: the window has nothing left to show. */
+    private boolean emptied;
+
+    /** {@code input} is the window's lwjgl input, live while any of its screens runs. */
+    HostedStack(final Window window, final HostedInput input) {
+        this.window = window;
+        this.windowScopes = ScopePipeline.builder()
+            .always(input)
+            .ifMod(ModCompat.NEI, () -> new NeiScope(this::resolveCurrentContainer))
+            .build();
+    }
 
     private @Nullable GuiContainer resolveCurrentContainer() {
         final HostedScreen<?> t = running != null ? running : isEmpty() ? null : top();
@@ -45,73 +63,148 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         return null;
     }
 
-    /** The entry {@code entry} hangs on: the nearest bound entry at or below it, else itself. */
+    /** The entry {@code entry} hangs on: the nearest container screen at or below it, else itself. */
     public HostedScreen<?> boundBaseOf(final HostedScreen<?> entry) {
         for (int i = indexOf(entry); i >= 0; i--) {
             final HostedScreen<?> e = get(i);
-            if (ServerContainerMultiplexer.INSTANCE.containerOf(e.screen()) != null) return e;
+            if (multiplexer.containerOf(e.screen()) != null) return e;
         }
         return entry;
     }
 
-    public void pushEntry(final HostedScreen<?> e) {
-        e.requestResize();
-        add(e);
+    /** Whether the stack lost its last entry and got no new one since. */
+    boolean wasEmptied() {
+        return emptied && isEmpty();
     }
 
-    /** Runs {@code action} for the top entry, in its scope and for its view. */
+    // ================================================================== running an entry's code
+
+    /**
+     * Runs {@code action} on the top screen in its scopes, so that Minecraft's globals, lwjgl's input and the
+     * statics of other mods are that screen's, as they are the main window's for a main-window screen.
+     */
     public void runScoped(final Consumer<HostedScreen<?>> action) {
-        if (isEmpty()) return;
-        runScoped(FrameEvent.EMPTY, -1, -1, top(), true, action);
+        if (!isEmpty()) runScoped(top(), true, action);
     }
 
-    /** Runs {@code action} for {@code entry}, which need not be in the stack any more (disposal). */
-    public void runScopedOn(final HostedScreen<?> entry, final boolean applyDeferred,
+    /**
+     * The scopes of a run, outermost first: the entry's view (who the code acts for, Minecraft's GUI globals),
+     * the window's (lwjgl input, NEI), the UI's own. Screen changes the entry's GUI asks for meanwhile are applied
+     * when the view's scope ends, unless {@code applyRequests} is false (layout, disposal).
+     */
+    private void runScoped(final HostedScreen<?> entry, final boolean applyRequests,
         final Consumer<HostedScreen<?>> action) {
-        runScoped(FrameEvent.EMPTY, -1, -1, entry, applyDeferred, action);
-    }
-
-    public void runScoped(final FrameEvent event, final int pixelWidth, final int pixelHeight,
-        final HostedScreen<?> entry, final boolean applyDeferred, final Consumer<HostedScreen<?>> action) {
-        final HostedScreen<?> prevRunning = running;
+        // hosted screens live in a world; between its unload and the windows closing nothing runs
+        if (!multiplexer.isInWorld()) return;
+        final HostedViewContext view = new HostedViewContext(
+            multiplexer,
+            entry,
+            window.getPixelWidth(),
+            window.getPixelHeight(),
+            applyRequests);
+        final HostedScreen<?> outer = running;
         running = entry;
 
         try {
-            ServerContainerMultiplexer.INSTANCE.contexts
-                .runInHostedView(entry, () -> runScopes(event, pixelWidth, pixelHeight, entry, action), applyDeferred);
-        } finally {
-            running = prevRunning;
-        }
-    }
-
-    /** Every scope is entered inside the try whose finally restores it. */
-    private void runScopes(final FrameEvent event, final int pixelWidth, final int pixelHeight,
-        final HostedScreen<?> entry, final Consumer<HostedScreen<?>> action) {
-        try {
-            windowScopes.enter();
-            runEntryScope(event, pixelWidth, pixelHeight, entry, action);
+            ScopePipeline.of(view, windowScopes, entry.scope())
+                .run(() -> action.accept(entry));
         } catch (final Throwable t) {
             Offscreen.LOG.error("[Offscreen] scoped action failed", t);
         } finally {
-            windowScopes.restore();
+            running = outer;
         }
     }
 
-    /** The entry's own scope and the mouse shadow, inside the window scopes. */
-    private void runEntryScope(final FrameEvent event, final int pixelWidth, final int pixelHeight,
-        final HostedScreen<?> entry, final Consumer<HostedScreen<?>> action) {
-        final Scope own = entry.scope();
-        try {
-            own.enter();
-            MouseShadow.set(event.mouseX, event.mouseY, pixelWidth, pixelHeight);
-            action.accept(entry);
-        } finally {
-            MouseShadow.clear();
-            own.restore();
-        }
+    // ================================================================== changing the stack
+
+    public HostedScreen<?> pushUI(final HostUI ui) {
+        final HostedScreen<?> e = new HostedScreen<>(window, ui);
+        e.requestResize();
+        add(e);
+        emptied = false;
+        return e;
     }
 
-    /** Drops every entry without telling the multiplexer (world unload, window destruction). */
+    /** Pushes the entry for {@code s}; every screen has a host UI, vanilla's at least. */
+    public HostedScreen<?> pushScreen(final GuiScreen s) {
+        if (UIRegistry.resolve(s) instanceof HostUI ui) return pushUI(ui);
+        return pushUI(new VanillaUI(s));
+    }
+
+    /** Pushes {@code s} and lays it out now: initGui must run before the packet handler writes the window id. */
+    public HostedScreen<?> pushNow(final GuiScreen s) {
+        final HostedScreen<?> e = pushScreen(s);
+        final ScaledResolution resolution = new ScaledResolution(
+            Minecraft.getMinecraft(),
+            window.getPixelWidth(),
+            window.getPixelHeight());
+        runScoped(e, false, entry -> entry.resize(resolution.getScaledWidth(), resolution.getScaledHeight()));
+        return e;
+    }
+
+    /**
+     * Removes {@code e} and everything above it, each as the player closing it would: its {@code onGuiClosed}
+     * inside its scopes, then disposal. Containers that lose their view this way are left to the caller.
+     */
+    public void removeFrom(final HostedScreen<?> e) {
+        while (contains(e)) {
+            final HostedScreen<?> closing = pop();
+            runScoped(
+                closing,
+                false,
+                s -> s.screen()
+                    .onGuiClosed());
+            closing.dispose();
+        }
+
+        // an emptied window is destroyed by its owner on its next frame or tick
+        if (isEmpty()) emptied = true;
+        else top().requestResize();
+    }
+
+    /**
+     * A GUI the server opened is pushed over {@code entry}; once its container is known it replaces {@code entry}
+     * if that shows a container too.
+     */
+    Runnable placeArrivalOver(final HostedScreen<?> entry, final GuiScreen s) {
+        if (!window.isOpen()) return Driver.INSTANCE.mainWindow.place(s);
+        final HostedScreen<?> arrived = pushNow(s);
+        if (multiplexer.containerOf(entry.screen()) == null) return ServerProbes.NOTHING;
+        return () -> {
+            if (!contains(entry) || !remove(arrived)) return;
+            removeFrom(entry);
+            add(arrived);
+            arrived.requestResize();
+            emptied = false;
+        };
+    }
+
+    /**
+     * The GUI of {@code entry} displayed {@code incoming}: back to a screen of the stack, a child, or a replacement.
+     */
+    void applyDisplayRequest(final HostedScreen<?> entry, final GuiScreen incoming) {
+        final HostedScreen<?> existing = findEntry(incoming);
+        if (existing != null) {
+            // back to a screen of this stack: the ones above it close
+            final int above = indexOf(existing) + 1;
+            if (above < size()) removeFrom(get(above));
+            return;
+        }
+
+        final ServerContainer old = entry.gatingContainer();
+        final ServerContainer now = multiplexer.containerOf(incoming);
+        if (!contains(entry) || old == null || now == null || now == old) {
+            pushScreen(incoming); // a child of the entry
+            return;
+        }
+
+        // the GUI replaced itself by one of another container (Baubles back to the inventory)
+        removeFrom(boundBaseOf(entry));
+        pushScreen(incoming);
+        multiplexer.viewClosed(old, false);
+    }
+
+    /** Drops every entry without closing it for the multiplexer (world unload, window destruction). */
     void disposeAll() {
         while (!isEmpty()) pop().dispose();
         windowScopes.restore();

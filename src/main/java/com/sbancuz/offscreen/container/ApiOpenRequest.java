@@ -31,7 +31,8 @@ final class ApiOpenRequest implements ArrivalTarget {
         final Window w = window.get();
         window = () -> w;
         if (!w.isOpen()) return multiplexer.mainWindow.place(s);
-        w.pushNow(s);
+        w.stack()
+            .pushNow(s);
         return ServerProbes.NOTHING;
     }
 }

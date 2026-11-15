@@ -67,10 +67,6 @@ public final class InputRouter {
         }
     }
 
-    public boolean shadowActive() {
-        return savedKeyArray != null;
-    }
-
     public boolean ownsShadow(final Window w) {
         return keyShadowOwner == w && savedKeyArray != null;
     }
@@ -111,14 +107,5 @@ public final class InputRouter {
 
         window.capture(eventPtr);
         return false;
-    }
-
-    public static int sdlToGuiButton(final int sdlButton) {
-        return switch (sdlButton) {
-            case 1 -> 0;
-            case 3 -> 1;
-            case 2 -> 2;
-            default -> sdlButton - 1;
-        };
     }
 }

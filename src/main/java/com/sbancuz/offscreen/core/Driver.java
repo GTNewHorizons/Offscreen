@@ -9,6 +9,7 @@ import java.util.function.Predicate;
 import net.minecraft.client.Minecraft;
 
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.window.MainWindow;
 import com.sbancuz.offscreen.window.Window;
 import com.sbancuz.offscreen.window.input.InputRouter;
 
@@ -21,6 +22,7 @@ public class Driver {
 
     private final Map<Integer, Window> windows = new ConcurrentHashMap<>();
     private final InputRouter router = new InputRouter(windows);
+    public final MainWindow mainWindow = new MainWindow();
 
     @SubscribeEvent
     public void onRenderTick(final TickEvent.RenderTickEvent event) {
@@ -43,11 +45,6 @@ public class Driver {
         for (final Window w : windows.values()) {
             w.update();
         }
-    }
-
-    /** Whether {@code Keyboard.sdlKeyPressedArray} is currently a hosted window's shadow copy. */
-    public boolean keyShadowActive() {
-        return router.shadowActive();
     }
 
     public boolean ownsKeyShadow(final Window w) {

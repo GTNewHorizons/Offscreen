@@ -17,18 +17,28 @@ import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
  * Screen changes the view's GUI asks for are the view's to apply; what must not
  * happen while the GUI runs is collected here and applied once the run is over.
  */
-public final class ViewContext extends ExecutionContext {
+public class ViewContext extends ExecutionContext {
 
     private final ScreenView view;
     private final boolean forActiveView;
+    /** False for a run that lays a screen out or disposes it: what its GUI asks for meanwhile is dropped. */
+    private final boolean appliesDeferred;
     private final List<Runnable> afterRun = new ArrayList<>(0);
     /** The run sent packets that act on the server's open container or mod payloads. */
     private boolean serverDependent;
 
-    ViewContext(final ServerContainerMultiplexer multiplexer, final ScreenView view) {
+    ViewContext(final ServerContainerMultiplexer multiplexer, final ScreenView view, final boolean appliesDeferred) {
         super(multiplexer);
         this.view = view;
         this.forActiveView = view.isActiveView();
+        this.appliesDeferred = appliesDeferred;
+    }
+
+    /** The run is over: what it deferred is applied now, outside it. */
+    @Override
+    public void restore() {
+        super.restore();
+        if (appliesDeferred) afterRun.forEach(Runnable::run);
     }
 
     @Override
@@ -68,9 +78,5 @@ public final class ViewContext extends ExecutionContext {
     @Override
     public void runAfterScope(final Runnable r) {
         afterRun.add(r);
-    }
-
-    void applyAfterRun() {
-        afterRun.forEach(Runnable::run);
     }
 }

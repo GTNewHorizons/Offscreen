@@ -12,6 +12,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.core.Driver;
 
 /** Routes screen changes, the main window's input and updates, and right clicks through the multiplexer. */
 @Mixin(Minecraft.class)
@@ -26,14 +27,14 @@ public abstract class MinecraftMixin {
         method = "runTick",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiScreen;handleInput()V"))
     private void offscreen$gateScreenInput(final GuiScreen screen, final Operation<Void> original) {
-        ServerContainerMultiplexer.INSTANCE.mainWindow.onHandleInput(screen, () -> original.call(screen));
+        Driver.INSTANCE.mainWindow.onHandleInput(screen, () -> original.call(screen));
     }
 
     @WrapOperation(
         method = "runTick",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiScreen;updateScreen()V"))
     private void offscreen$gateScreenUpdate(final GuiScreen screen, final Operation<Void> original) {
-        ServerContainerMultiplexer.INSTANCE.mainWindow.onUpdateScreen(screen, () -> original.call(screen));
+        Driver.INSTANCE.mainWindow.onUpdateScreen(screen, () -> original.call(screen));
     }
 
     @Inject(method = "func_147121_ag", at = @At("HEAD"), cancellable = true)

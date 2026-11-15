@@ -56,9 +56,9 @@ import com.sbancuz.offscreen.window.Window;
  * <p>
  * The model is the {@link #activeContainer} (proven to be the server's open container at this
  * point of the inbound stream) and the {@link Phase}. It owns the parts the hooks work through:
- * the {@link ContextStack} code runs in, the {@link MainWindow}, the {@link GatedViewInput} and
- * {@link GatedViewOverlay}, the
- * {@link ServerProbes} and the adapters. Every hook the mixins call is here.
+ * the {@link ContextStack} code runs in, Minecraft's {@link GuiGlobals}, the {@link GatedViewInput} and
+ * {@link GatedViewOverlay}, the {@link ServerProbes} and the adapters. The places its views are in belong to
+ * the window side: the {@link MainWindow} and the hosted {@link Window}s of the {@link Driver}.
  */
 public final class ServerContainerMultiplexer {
 
@@ -80,7 +80,8 @@ public final class ServerContainerMultiplexer {
     final Minecraft mc = Minecraft.getMinecraft();
     public final ContextStack contexts = new ContextStack(this);
     public final GuiGlobals globals = new GuiGlobals();
-    public final MainWindow mainWindow = new MainWindow(this);
+    /** The main window's screen slot, one of the places a view can be in; the {@link Driver}'s, set at mod init. */
+    public MainWindow mainWindow;
     public final GatedViewInput gatedInput = new GatedViewInput(this);
     public final GatedViewOverlay overlay = new GatedViewOverlay(this);
     /** Registered adapters, latest first. */
@@ -106,9 +107,9 @@ public final class ServerContainerMultiplexer {
     private ServerContainerMultiplexer() {}
 
     /** On the main thread, at mod init. */
-    public void init() {
+    public void init(final MainWindow mainWindow) {
+        this.mainWindow = mainWindow;
         contexts.init();
-        mainWindow.register();
         gatedInput.register();
     }
 
@@ -330,7 +331,7 @@ public final class ServerContainerMultiplexer {
 
     /** Runs {@code r} (an adapter's channel write, an API trigger) so that what it sends passes unchecked. */
     public void runAsMultiplexer(final Runnable r) {
-        contexts.run(new MultiplexerContext(this), r);
+        new MultiplexerContext(this).run(r);
     }
 
     /** The adapter for a screen; vanilla's when no other claims it. */
@@ -366,9 +367,17 @@ public final class ServerContainerMultiplexer {
         final short tid = b.clientContainer.getNextTransactionID(player.inventory);
         final GuiScreen screen = screenShowing(b);
 
-        final Supplier<ItemStack> click = () -> b.clientContainer.slotClick(slot, 0, 0, player);
-        final ItemStack predicted = contexts
-            .call(new MultiplexerContext(this), () -> globals.callWith(screen, b.clientContainer, click));
+        // predicted as the GUI showing b would predict it: with its screen and container as Minecraft's globals
+        final ItemStack predicted;
+        final MultiplexerContext prediction = new MultiplexerContext(this);
+        globals.lend(screen, b.clientContainer);
+        prediction.enter();
+        try {
+            predicted = b.clientContainer.slotClick(slot, 0, 0, player);
+        } finally {
+            prediction.restore();
+            globals.giveBack();
+        }
         final C0EPacketClickWindow c = new C0EPacketClickWindow(b.windowId, slot, 0, 0, predicted, tid);
         probes.sendTracked(c, ServerProbes.NO_CAUSE, onAnswer, this::resetToPlayerInventory);
     }

@@ -24,7 +24,7 @@ import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
 import com.sbancuz.offscreen.container.ServerContainer;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.window.HostedScreen;
-import com.sbancuz.offscreen.window.Window;
+import com.sbancuz.offscreen.window.HostedStack;
 
 /**
  * The handling of one inbound play packet. What the packet tells about the server's open
@@ -55,24 +55,34 @@ public final class InboundPacketContext extends ExecutionContext {
         this.mainBefore = multiplexer.mainWindow.screen();
     }
 
-    /** Runs the vanilla handler in this frame, between the evidence rules and post-handling. */
+    /** Runs the vanilla handler in this scope, between the evidence rules and post-handling. */
     public void handle(final Runnable handler) {
         if (consumedAsEvidence()) return;
 
         boolean ok = false;
         try {
-            runWithMainWindowGlobals(handler);
+            run(handler);
             ok = true;
         } finally {
             afterHandler(ok);
         }
     }
 
-    /** The handler sees the main window's screen and the active container as Minecraft's globals. */
-    private void runWithMainWindowGlobals(final Runnable handler) {
+    /**
+     * The handler sees what a single-window client would: the screen of the active container's view and the
+     * active container as Minecraft's globals.
+     */
+    @Override
+    public void enter() {
         final GuiScreen screen = multiplexer.screenForInboundHandlers();
-        final Container open = multiplexer.activeContainer().clientContainer;
-        multiplexer.contexts.run(this, () -> multiplexer.globals.runWith(screen, open, handler));
+        multiplexer.globals.lend(screen, multiplexer.activeContainer().clientContainer);
+        super.enter();
+    }
+
+    @Override
+    public void restore() {
+        super.restore();
+        multiplexer.globals.giveBack();
     }
 
     @Override
@@ -191,10 +201,9 @@ public final class InboundPacketContext extends ExecutionContext {
 
         for (final HostedScreen<?> e : multiplexer.hostedScreens()) {
             if (e.screen() != ctx) continue;
-            final Window w = e.window();
-            w.removeFrom(
-                w.stack()
-                    .boundBaseOf(e));
+            final HostedStack stack = e.window()
+                .stack();
+            stack.removeFrom(stack.boundBaseOf(e));
             return;
         }
     }
