@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.context;
+package com.sbancuz.offscreen.container.routing;
 
 import java.util.function.Consumer;
 
@@ -11,9 +11,9 @@ import com.sbancuz.offscreen.container.ScreenView;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 
 /** Any thread but the main one: no view, no routing. */
-final class OffThreadContext extends ExecutionContext {
+public final class OffThreadScope extends RoutingScope {
 
-    OffThreadContext(final ServerContainerMultiplexer multiplexer) {
+    public OffThreadScope(final ServerContainerMultiplexer multiplexer) {
         super(multiplexer);
     }
 
@@ -29,11 +29,6 @@ final class OffThreadContext extends ExecutionContext {
 
     @Override
     boolean blocksOutbound() {
-        return false;
-    }
-
-    @Override
-    boolean onMainThread() {
         return false;
     }
 

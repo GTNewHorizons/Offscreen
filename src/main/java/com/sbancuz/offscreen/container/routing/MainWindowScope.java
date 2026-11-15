@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.context;
+package com.sbancuz.offscreen.container.routing;
 
 import java.util.function.Consumer;
 
@@ -10,10 +10,10 @@ import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
 import com.sbancuz.offscreen.container.ScreenView;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 
-/** The bottom context: the main window, acting for its view while it shows a container screen. */
-final class MainWindowContext extends ExecutionContext {
+/** Outside every other scope: the main window, acting for its view while it shows a container screen. */
+public final class MainWindowScope extends RoutingScope {
 
-    MainWindowContext(final ServerContainerMultiplexer multiplexer) {
+    public MainWindowScope(final ServerContainerMultiplexer multiplexer) {
         super(multiplexer);
     }
 

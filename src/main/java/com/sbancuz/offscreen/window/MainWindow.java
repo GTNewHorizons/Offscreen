@@ -8,6 +8,7 @@ import javax.annotation.Nullable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -20,7 +21,10 @@ import com.sbancuz.offscreen.container.ScreenView;
 import com.sbancuz.offscreen.container.ServerContainer;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.container.ServerProbes;
-import com.sbancuz.offscreen.container.context.UnroutedMainScreenContext;
+import com.sbancuz.offscreen.container.routing.UnroutedMainScreenScope;
+import com.sbancuz.offscreen.container.routing.ViewScope;
+import com.sbancuz.offscreen.scope.ScopePipeline;
+import com.sbancuz.offscreen.scope.ScreenScope;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -39,6 +43,8 @@ public final class MainWindow implements ScreenView {
     private final ServerContainerMultiplexer multiplexer = ServerContainerMultiplexer.INSTANCE;
     private final Minecraft mc = Minecraft.getMinecraft();
 
+    /** The innermost entered {@link ScreenScope}; null while no run has Minecraft's GUI globals. Kept by the scopes. */
+    public @Nullable ScreenScope screenScope;
     /** The container screen under the free screen the main window shows now; it stays open. */
     private @Nullable GuiScreen covered;
     /** The previous state, to regain ingame focus on a change only. */
@@ -53,10 +59,26 @@ public final class MainWindow implements ScreenView {
         MinecraftForge.EVENT_BUS.register(this);
     }
 
-    /** The main window's screen, also while a run for another screen has {@code currentScreen} lent. */
+    /** The main window's screen, also while a {@link ScreenScope} makes {@code currentScreen} another one. */
     @Override
     public @Nullable GuiScreen screen() {
-        return multiplexer.globals.mainScreen();
+        if (screenScope == null) return mc.currentScreen;
+        return screenScope.mainWindowScreen();
+    }
+
+    /** Whether Minecraft's GUI globals describe another screen right now, not this window's. */
+    private boolean globalsBorrowed() {
+        return screenScope != null && screenScope.describesAnotherScreen();
+    }
+
+    /** While the globals are this window's, the open container is its screen's container or the inventory. */
+    public void syncOpenContainer() {
+        // a disconnect inside a handler leaves no player behind
+        if (globalsBorrowed() || mc.thePlayer == null) return;
+        mc.thePlayer.openContainer = mc.thePlayer.inventoryContainer;
+        if (mc.currentScreen instanceof GuiContainer gc && gc.inventorySlots != null) {
+            mc.thePlayer.openContainer = gc.inventorySlots;
+        }
     }
 
     public @Nullable GuiScreen coveredScreen() {
@@ -67,7 +89,7 @@ public final class MainWindow implements ScreenView {
 
     /** Whether runTick is handling the main window's own screen, in a world. */
     private boolean handlesOwnScreen(final GuiScreen screen) {
-        return !multiplexer.globals.areLent() && screen == mc.currentScreen && multiplexer.isInWorld();
+        return !globalsBorrowed() && screen == mc.currentScreen && multiplexer.isInWorld();
     }
 
     /**
@@ -83,19 +105,24 @@ public final class MainWindow implements ScreenView {
         movePending = false;
         if (move && moveToNewWindow()) return;
 
-        multiplexer.contexts.runInMainWindowView(() -> multiplexer.gatedInput.handleInput(this, original));
+        runAsView(() -> multiplexer.gatedInput.handleInput(this, original));
     }
 
     /** Wraps {@code currentScreen.updateScreen()} in {@code runTick}: a gated screen is a snapshot, without updates. */
     public void onUpdateScreen(final GuiScreen screen, final Runnable original) {
         if (!handlesOwnScreen(screen)) original.run();
-        else if (receivesInput()) multiplexer.contexts.runInMainWindowView(original);
+        else if (receivesInput()) runAsView(original);
+    }
+
+    /** Runs the screen's input or update as the view's; screen changes it defers are applied after the run. */
+    private void runAsView(final Runnable body) {
+        new ViewScope(multiplexer, this, true).run(body);
     }
 
     /** Drawn after the main window's screen: what the multiplexer shows over a view, and the MOVE key poll. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onDrawScreenPost(final GuiScreenEvent.DrawScreenEvent.Post event) {
-        if (multiplexer.globals.areLent() || event.gui != screen() || !multiplexer.isInWorld()) return;
+        if (globalsBorrowed() || event.gui != screen() || !multiplexer.isInWorld()) return;
         final int key = moveKey.getKeyCode();
         final boolean down = Display.isActive() && key > 0 && Keyboard.isKeyDown(key);
         movePending |= down && !moveDown;
@@ -112,7 +139,7 @@ public final class MainWindow implements ScreenView {
     /** To a new hosted window: no displayGuiScreen, no onGuiClosed, no packet. */
     public boolean moveToNewWindow() {
         final GuiScreen s = screen();
-        if (s == null || multiplexer.globals.areLent() || multiplexer.isSwitching()) return false;
+        if (s == null || globalsBorrowed() || multiplexer.isSwitching()) return false;
         final Window w = new Window(
             s.getClass()
                 .getSimpleName());
@@ -127,7 +154,7 @@ public final class MainWindow implements ScreenView {
             .detachFromMainWindow(g);
 
         mc.currentScreen = null;
-        multiplexer.globals.restoreMainWindowContainer();
+        syncOpenContainer();
         for (final GuiScreen g : moving) w.stack()
             .pushScreen(g);
         // the main window is the game again
@@ -143,7 +170,7 @@ public final class MainWindow implements ScreenView {
     public void moveFromWindow(final Window w) {
         final HostedStack st = w.stack();
         if (st.isEmpty() || screen() != null || !multiplexer.isInWorld()) return;
-        if (multiplexer.globals.areLent() || multiplexer.isSwitching()) return;
+        if (globalsBorrowed() || multiplexer.isSwitching()) return;
         final int from = st.indexOf(st.boundBaseOf(st.top()));
         final List<HostedScreen<?>> moving = new ArrayList<>(st.subList(from, st.size()));
         st.removeElements(from, st.size());
@@ -240,7 +267,8 @@ public final class MainWindow implements ScreenView {
 
     /** Changes the screen as the multiplexer: vanilla side effects on the real main-window state, no routing. */
     public void showUnrouted(@Nullable final GuiScreen s) {
-        new UnroutedMainScreenContext(multiplexer).run(() -> mc.displayGuiScreen(s));
+        ScopePipeline.of(new UnroutedMainScreenScope(multiplexer), new ScreenScope(this))
+            .run(() -> mc.displayGuiScreen(s));
     }
 
     /** Vanilla runs, then a container view that went away is closed. */
@@ -265,7 +293,7 @@ public final class MainWindow implements ScreenView {
      */
     public @Nullable ServerContainer afterScreenChanged(@Nullable final GuiScreen old) {
         final ServerContainer closed = updateCover(old, screen());
-        multiplexer.globals.restoreMainWindowContainer();
+        syncOpenContainer();
         restoreIngameFocus();
         return closed;
     }
@@ -313,7 +341,7 @@ public final class MainWindow implements ScreenView {
 
     /** The main window regains ingame focus when it has no screen, on the change and on OS focus. */
     public void restoreIngameFocus() {
-        if (multiplexer.globals.areLent() || !multiplexer.isInWorld()) return;
+        if (globalsBorrowed() || !multiplexer.isInWorld()) return;
         final boolean mainNull = mc.currentScreen == null;
         final boolean active = Display.isActive();
         final boolean transition = !lastMainNull || !lastActive;

@@ -121,12 +121,14 @@ public final class Mui2Adapter implements ContainerAdapter {
         final ServerContainerMultiplexer multiplexer = ServerContainerMultiplexer.INSTANCE;
         final int active = nid(multiplexer.activeContainer());
         final boolean forActive = active >= 0 && packetNid(p) == active;
+        final boolean activeView = multiplexer.routing()
+            .actsForActiveView();
         if (p instanceof OpenGuiPacket) return PayloadEffect.OPENS_GUI;
 
         // the client never needs to reopen anything but the active container itself (a no-op)
         if (p instanceof ReopenGuiPacket) return forActive ? PayloadEffect.NEUTRAL : PayloadEffect.DROP;
         // CloseGui closes whatever the server has open: only for the active container itself, or while that is harmless
-        if (p instanceof CloseGuiPacket && forActive && multiplexer.fromActiveView()) return PayloadEffect.CLOSES_GUI;
+        if (p instanceof CloseGuiPacket && forActive && activeView) return PayloadEffect.CLOSES_GUI;
         if (p instanceof CloseGuiPacket)
             return multiplexer.idleAtQuietPlayerInventory() ? PayloadEffect.NEUTRAL : PayloadEffect.DROP;
         if (p instanceof CloseAllGuiPacket)

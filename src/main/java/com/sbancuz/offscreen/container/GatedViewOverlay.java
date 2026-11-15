@@ -59,7 +59,7 @@ public final class GatedViewOverlay {
     /** Whether {@code gc} draws the cursor stack: the stack belongs to the server's open container. */
     public boolean cursorVisible(final GuiContainer gc) {
         if (!multiplexer.isInWorld()) return true;
-        final ScreenView v = multiplexer.contexts.current()
+        final ScreenView v = multiplexer.routing()
             .view();
         if (v.screen() != gc) return true;
 

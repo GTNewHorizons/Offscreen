@@ -1,5 +1,6 @@
 package com.sbancuz.offscreen.container;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -9,6 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
 
 import com.sbancuz.offscreen.config.ContainerProtocolConfig;
 import com.sbancuz.offscreen.container.ContainerAdapter.SlotOnClose;
@@ -70,6 +72,21 @@ public final class ServerContainer {
 
     public State state() {
         return state;
+    }
+
+    void setState(final State s) {
+        if (state != s && ContainerProtocolConfig.debugLog)
+            ServerContainerMultiplexer.LOG.info("[Containers] {} -> {}", this, s);
+        state = s;
+    }
+
+    /** Where to park the cursor stack: an empty slot of the player inventory that accepts it; the hotbar last. */
+    Optional<Slot> findParkingSlot(final ItemStack cursor) {
+        final InventoryPlayer inventory = Minecraft.getMinecraft().thePlayer.inventory;
+        return slots().stream()
+            .filter(s -> s.inventory == inventory && !s.getHasStack() && s.getSlotIndex() <= 35)
+            .filter(s -> s.isItemValid(cursor))
+            .min(Comparator.comparing(s -> s.getSlotIndex() < 9));
     }
 
     /**

@@ -2,7 +2,6 @@ package com.sbancuz.offscreen.container;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,13 +34,16 @@ import org.apache.logging.log4j.Logger;
 import com.sbancuz.offscreen.config.ContainerProtocolConfig;
 import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
 import com.sbancuz.offscreen.container.ServerContainer.State;
-import com.sbancuz.offscreen.container.context.ContextStack;
-import com.sbancuz.offscreen.container.context.InboundPacketContext;
-import com.sbancuz.offscreen.container.context.MultiplexerContext;
 import com.sbancuz.offscreen.container.reopen.OpeningInteraction;
+import com.sbancuz.offscreen.container.routing.InboundPacketScope;
+import com.sbancuz.offscreen.container.routing.MainWindowScope;
+import com.sbancuz.offscreen.container.routing.MultiplexerScope;
+import com.sbancuz.offscreen.container.routing.OffThreadScope;
+import com.sbancuz.offscreen.container.routing.RoutingScope;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.mixins.early.MinecraftAccessor;
-import com.sbancuz.offscreen.window.GuiGlobals;
+import com.sbancuz.offscreen.scope.ScopePipeline;
+import com.sbancuz.offscreen.scope.ScreenScope;
 import com.sbancuz.offscreen.window.HostedScreen;
 import com.sbancuz.offscreen.window.MainWindow;
 import com.sbancuz.offscreen.window.Window;
@@ -56,7 +58,7 @@ import com.sbancuz.offscreen.window.Window;
  * <p>
  * The model is the {@link #activeContainer} (proven to be the server's open container at this
  * point of the inbound stream) and the {@link Phase}. It owns the parts the hooks work through:
- * the {@link ContextStack} code runs in, Minecraft's {@link GuiGlobals}, the {@link GatedViewInput} and
+ * the {@link RoutingScope} code runs in, the {@link GatedViewInput} and
  * {@link GatedViewOverlay}, the {@link ServerProbes} and the adapters. The places its views are in belong to
  * the window side: the {@link MainWindow} and the hosted {@link Window}s of the {@link Driver}.
  */
@@ -78,8 +80,13 @@ public final class ServerContainerMultiplexer {
     }
 
     final Minecraft mc = Minecraft.getMinecraft();
-    public final ContextStack contexts = new ContextStack(this);
-    public final GuiGlobals globals = new GuiGlobals();
+    /**
+     * Who the code running on the main thread acts for: the main window, until a {@link RoutingScope} is entered. A
+     * scope swaps this like any scope swaps the state it stands for, and puts the enclosing one back.
+     */
+    private RoutingScope routing = new MainWindowScope(this);
+    private final RoutingScope offThreadRouting = new OffThreadScope(this);
+    private volatile Thread mainThread;
     /** The main window's screen slot, one of the places a view can be in; the {@link Driver}'s, set at mod init. */
     public MainWindow mainWindow;
     public final GatedViewInput gatedInput = new GatedViewInput(this);
@@ -109,7 +116,7 @@ public final class ServerContainerMultiplexer {
     /** On the main thread, at mod init. */
     public void init(final MainWindow mainWindow) {
         this.mainWindow = mainWindow;
-        contexts.init();
+        mainThread = Thread.currentThread();
         gatedInput.register();
     }
 
@@ -117,26 +124,46 @@ public final class ServerContainerMultiplexer {
         adapters.add(0, adapter);
     }
 
+    // ================================================================== who the running code acts for
+
+    public boolean onMainThread() {
+        final Thread t = mainThread;
+        return t == null || Thread.currentThread() == t;
+    }
+
+    /**
+     * The scope the running code is in. The hooks ask it what to do, so they need not know where they are called from.
+     */
+    public RoutingScope routing() {
+        if (onMainThread()) return routing;
+        return offThreadRouting;
+    }
+
+    /** Makes {@code scope} the scope the main thread's code is in and returns the one it replaces. */
+    public RoutingScope replaceRouting(final RoutingScope scope) {
+        final RoutingScope replaced = routing;
+        routing = scope;
+        return replaced;
+    }
+
     // ================================================================== choke points (5)
 
     /** {@code Minecraft.displayGuiScreen}. */
     public void onDisplayGuiScreen(@Nullable final GuiScreen incoming, final Consumer<GuiScreen> vanilla) {
         if (!isInWorld()) vanilla.accept(incoming);
-        else contexts.current()
-            .displayScreen(incoming, vanilla);
+        else routing().displayScreen(incoming, vanilla);
     }
 
     /** {@code EntityClientPlayerMP.closeScreen} / {@code closeScreenNoPacket}. Returns true if handled. */
     public boolean onCloseScreen(final boolean packet) {
-        if (!contexts.onMainThread() || !isInWorld()) return false;
+        if (!onMainThread() || !isInWorld()) return false;
         if (playerDead()) {
             onDeath(); // GuiContainer.updateScreen closes on death
             mainWindow.showUnrouted(null);
             return true;
         }
 
-        contexts.current()
-            .closeScreen(packet);
+        routing().closeScreen(packet);
         return true;
     }
 
@@ -149,16 +176,15 @@ public final class ServerContainerMultiplexer {
             return;
         }
 
-        if (isInWorld()) new InboundPacketContext(this, p).handle(handler);
+        if (isInWorld()) new InboundPacketScope(this, p).handle(handler);
         else handler.run();
     }
 
-    /** One outbound packet: {@code send} lets it leave; the current context may drop it or add a follow-up. */
+    /** One outbound packet: {@code send} lets it leave; the scope it is sent from may drop it or add a follow-up. */
     public void onOutboundPacket(final Packet p, final Runnable send) {
         Runnable action = send;
         try {
-            if (isInWorld()) action = contexts.current()
-                .routeOutbound(p, send);
+            if (isInWorld()) action = routing().routeOutbound(p, send);
         } catch (final RuntimeException e) {
             LOG.error("[Containers] outbound routing failed; passing the packet", e);
         }
@@ -167,14 +193,12 @@ public final class ServerContainerMultiplexer {
 
     /** Whether a click or C11 for window {@code w} may be sent by the running code. */
     public boolean allowsClick(final int w) {
-        return !isInWorld() || contexts.current()
-            .allowsClick(w);
+        return !isInWorld() || routing().allowsClick(w);
     }
 
     /** A handler changed the open container silently (ModularUI2 close and reopen packets): check after it. */
     public void requestReconcile() {
-        if (isInWorld()) contexts.current()
-            .requestReconcile();
+        if (isInWorld()) routing().requestReconcile();
     }
 
     /** Whether {@code GuiContainer.onGuiClosed} may run this container's close logic itself. */
@@ -245,18 +269,12 @@ public final class ServerContainerMultiplexer {
         return s != null && containerOf(s) == null;
     }
 
-    /** Whether the running code acts for the active view; fixed at the start of a view's run. */
-    public boolean fromActiveView() {
-        return contexts.current()
-            .actsForActiveView();
-    }
-
     public boolean hasOpenContainerOf(final ContainerAdapter adapter) {
         for (final ServerContainer b : openContainers.values()) if (b.adapter == adapter) return true;
         return false;
     }
 
-    /** ClientCloseLogicContext the inventory container on the server would drop nothing: empty cursor and 2x2 grid. */
+    /** Closing the inventory container on the server would drop nothing: empty cursor and 2x2 grid. */
     public boolean playerInventoryDropsNothing() {
         return cursorStack() == null && !playerInventory.wouldDropItemsOnClose();
     }
@@ -282,11 +300,6 @@ public final class ServerContainerMultiplexer {
             .topScreenOfPlace();
         if (mainWindow.gatingContainer() == null) return mainWindow.screen();
         return null;
-    }
-
-    void setState(final ServerContainer b, final State s) {
-        if (b.state != s && ContainerProtocolConfig.debugLog) LOG.info("[Containers] {} -> {}", b, s);
-        b.state = s;
     }
 
     // ================================================================== views
@@ -331,7 +344,7 @@ public final class ServerContainerMultiplexer {
 
     /** Runs {@code r} (an adapter's channel write, an API trigger) so that what it sends passes unchecked. */
     public void runAsMultiplexer(final Runnable r) {
-        new MultiplexerContext(this).run(r);
+        new MultiplexerScope(this).run(r);
     }
 
     /** The adapter for a screen; vanilla's when no other claims it. */
@@ -365,26 +378,20 @@ public final class ServerContainerMultiplexer {
     void clickSlot(final ServerContainer b, final int slot, final Consumer<Boolean> onAnswer) {
         final EntityClientPlayerMP player = mc.thePlayer;
         final short tid = b.clientContainer.getNextTransactionID(player.inventory);
-        final GuiScreen screen = screenShowing(b);
 
         // predicted as the GUI showing b would predict it: with its screen and container as Minecraft's globals
-        final ItemStack predicted;
-        final MultiplexerContext prediction = new MultiplexerContext(this);
-        globals.lend(screen, b.clientContainer);
-        prediction.enter();
-        try {
-            predicted = b.clientContainer.slotClick(slot, 0, 0, player);
-        } finally {
-            prediction.restore();
-            globals.giveBack();
-        }
-        final C0EPacketClickWindow c = new C0EPacketClickWindow(b.windowId, slot, 0, 0, predicted, tid);
-        probes.sendTracked(c, ServerProbes.NO_CAUSE, onAnswer, this::resetToPlayerInventory);
+        final ScreenScope itsGui = new ScreenScope(mainWindow, screenShowing(b), b.clientContainer);
+        ScopePipeline.of(new MultiplexerScope(this), itsGui)
+            .run(() -> {
+                final ItemStack predicted = b.clientContainer.slotClick(slot, 0, 0, player);
+                final C0EPacketClickWindow c = new C0EPacketClickWindow(b.windowId, slot, 0, 0, predicted, tid);
+                probes.sendTracked(c, ServerProbes.NO_CAUSE, onAnswer, this::resetToPlayerInventory);
+            });
     }
 
-    /** Places screens the server opens in reply to a hosted view in that view's window. */
-    public void attributeArrivalsTo(final HostedScreen<?> v) {
-        if (!knowsServerState()) return;
+    /** Places screens the server opens in reply to a view in that view's place; the main window gets them anyway. */
+    public void attributeArrivalsTo(final ScreenView v) {
+        if (v == mainWindow || !knowsServerState()) return;
         if (probes.barrierSupported()) {
             probes.attributeArrivalsTo(v);
             return;
@@ -461,14 +468,14 @@ public final class ServerContainerMultiplexer {
      */
     void pauseContainer(final ServerContainer b) {
         if (b.isPlayerInventory() || b.state == State.CLOSED) return;
-        if (hasView(b)) setState(b, State.PAUSED);
+        if (hasView(b)) b.setState(State.PAUSED);
         else closeContainer(b);
     }
 
     /** Closed for good: views closed, close logic run once, adapter told. */
     public void closeContainer(final ServerContainer b) {
         if (b.isPlayerInventory() || b.state == State.CLOSED) return;
-        setState(b, State.CLOSED);
+        b.setState(State.CLOSED);
         removeViews(b);
         openContainers.remove(b.clientContainer);
         runClientCloseLogic(b.clientContainer);
@@ -490,7 +497,9 @@ public final class ServerContainerMultiplexer {
         final ItemStack held = ItemStack.copyItemStack(inventory.getItemStack());
 
         try {
-            contexts.runClientCloseLogic(clientContainer, player);
+            final ScreenScope itsGui = new ScreenScope(mainWindow, mc.currentScreen, clientContainer);
+            ScopePipeline.of(new MultiplexerScope(this, true), itsGui)
+                .run(() -> clientContainer.onContainerClosed(player));
         } catch (final RuntimeException e) {
             LOG.warn("[Containers] client-side container close failed", e);
         } finally {
@@ -660,20 +669,17 @@ public final class ServerContainerMultiplexer {
     }
 
     private void resetAttempt(final int n) {
+        if (n > 3) {
+            LOG.error("[Containers] degraded: the server's open container is still unknown after three resets");
+            phase = Phase.DEGRADED;
+            return;
+        }
+
         sendAsMultiplexer(new C0DPacketCloseWindow(0));
         probes.checkOpen(0, () -> {
             for (final ServerContainer b : new ArrayList<>(openContainers.values())) pauseContainer(b);
             activatePlayerInventory();
-        }, () -> resetFailed(n));
-    }
-
-    private void resetFailed(final int n) {
-        if (n < 3) {
-            resetAttempt(n + 1);
-            return;
-        }
-        LOG.error("[Containers] degraded: the server's open container is still unknown after three resets");
-        phase = Phase.DEGRADED;
+        }, () -> resetAttempt(n + 1));
     }
 
     /** Containers without a view, or whose target is gone, are closed; checked each tick while idle. */
@@ -711,7 +717,7 @@ public final class ServerContainerMultiplexer {
         final ContainerSwitch t = new ContainerSwitch(this, to, keepParked, done);
         runningSwitch = t;
         phase = Phase.WAITING_FOR_SERVER;
-        if (!to.isPlayerInventory()) setState(to, State.REOPENING);
+        if (!to.isPlayerInventory()) to.setState(State.REOPENING);
         t.start();
         return OverlayHint.NONE;
     }
@@ -721,26 +727,17 @@ public final class ServerContainerMultiplexer {
         if (!isIdle() || to.state == State.CLOSED || active == to) return OverlayHint.BUSY;
         if (active.wouldDropItemsOnClose()) return OverlayHint.PINNED;
         final ItemStack cursor = cursorStack();
-        if (cursor != null && findParkingSlot(active, cursor).isEmpty()) return OverlayHint.NO_PARK_SLOT;
+        if (cursor != null && active.findParkingSlot(cursor)
+            .isEmpty()) return OverlayHint.NO_PARK_SLOT;
         if (!to.canReopenNow()) return OverlayHint.CANNOT_REOPEN;
         return OverlayHint.NONE;
-    }
-
-    /** Where to park the cursor stack: an empty slot of the player inventory that accepts it; the hotbar last. */
-    Optional<Slot> findParkingSlot(final ServerContainer b, final ItemStack cursor) {
-        final InventoryPlayer inventory = mc.thePlayer.inventory;
-        return b.slots()
-            .stream()
-            .filter(s -> s.inventory == inventory && !s.getHasStack() && s.getSlotIndex() <= 35)
-            .filter(s -> s.isItemValid(cursor))
-            .min(Comparator.comparing(s -> s.getSlotIndex() < 9));
     }
 
     // ================================================================== world interactions and API opens
 
     /** Right click on a block or entity, item use, horse inventory request. Returns true to cancel it. */
     public boolean onWorldUse(final boolean horse) {
-        if (!contexts.onMainThread() || !isInWorld()) return false;
+        if (!onMainThread() || !isInWorld()) return false;
         if (!isIdle()) return true;
         final Consumer<Boolean> again = ok -> { if (ok) repeatUse(horse); };
         if (!active.isPlayerInventory()) {
@@ -761,7 +758,7 @@ public final class ServerContainerMultiplexer {
             return;
         }
 
-        final Optional<Slot> slot = findParkingSlot(active, cursor);
+        final Optional<Slot> slot = active.findParkingSlot(cursor);
         if (slot.isEmpty()) {
             active.showHint(OverlayHint.NO_PARK_SLOT);
             return;

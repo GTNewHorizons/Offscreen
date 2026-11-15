@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.context;
+package com.sbancuz.offscreen.container.routing;
 
 import java.util.function.Consumer;
 
@@ -26,29 +26,29 @@ import com.sbancuz.offscreen.scope.Scope;
 import cpw.mods.fml.common.network.internal.FMLProxyPacket;
 
 /**
- * The scope of a run: who the running code acts for. It is the innermost context from {@link #enter} to
- * {@link #restore}; a context whose code must see another screen has Minecraft's GUI globals lent for as long.
- * Each overridable method is a question a hook asks; most defer to the enclosing context. What an outbound
- * packet may do follows from the answers.
+ * The scope that says who the running code acts for, and so routes what that code does: the packets it sends, its
+ * clicks, the screens it shows and closes. Like every {@link Scope} it swaps state for a run: the multiplexer's
+ * innermost routing scope. Each overridable method is a question a hook asks; most defer to the enclosing scope.
+ * What an outbound packet may do follows from the answers.
  */
-public abstract class ExecutionContext implements Scope {
+public abstract class RoutingScope implements Scope {
 
     protected final ServerContainerMultiplexer multiplexer;
-    /** The enclosing context, set by {@link ContextStack} when the run starts. */
-    ExecutionContext enclosing;
+    /** The scope this one was entered in. */
+    RoutingScope enclosing;
 
-    protected ExecutionContext(final ServerContainerMultiplexer multiplexer) {
+    protected RoutingScope(final ServerContainerMultiplexer multiplexer) {
         this.multiplexer = multiplexer;
     }
 
     @Override
     public void enter() {
-        multiplexer.contexts.push(this);
+        enclosing = multiplexer.replaceRouting(this);
     }
 
     @Override
     public void restore() {
-        multiplexer.contexts.pop(this);
+        multiplexer.replaceRouting(enclosing);
     }
 
     /** Code here acts for the view of the server's open container. */
@@ -69,10 +69,6 @@ public abstract class ExecutionContext implements Scope {
     /** Nothing sent from here reaches the server. */
     boolean blocksOutbound() {
         return enclosing.blocksOutbound();
-    }
-
-    boolean onMainThread() {
-        return true;
     }
 
     /** What a mod payload no adapter knows does, when sent from here. */
@@ -145,13 +141,13 @@ public abstract class ExecutionContext implements Scope {
 
     /** A C0D from an unhooked path: from the active view it counts as that view closing. */
     private Runnable routeCloseWindow(final Runnable send) {
-        if (onMainThread() && multiplexer.knowsServerState() && actsForActiveView()) {
+        if (multiplexer.onMainThread() && multiplexer.knowsServerState() && actsForActiveView()) {
             final ScreenView v = view();
             return followedBy(send, () -> v.close(false));
         }
         ServerContainerMultiplexer.LOG.warn("[Containers] dropped C0D from an unhooked path");
         // the caller has cleared the client cursor
-        if (onMainThread() && multiplexer.isIdle()) multiplexer.resyncActive();
+        if (multiplexer.onMainThread() && multiplexer.isIdle()) multiplexer.resyncActive();
         return ServerProbes.NOTHING;
     }
 
@@ -167,11 +163,11 @@ public abstract class ExecutionContext implements Scope {
      */
     private Runnable routeWorldUse(final Packet p, final Runnable send) {
         final ServerContainer active = multiplexer.activeContainer();
-        if (!multiplexer.isIdle() || !(onMainThread() || active.isPlayerInventory())) {
+        if (!multiplexer.isIdle() || !(multiplexer.onMainThread() || active.isPlayerInventory())) {
             ServerContainerMultiplexer.LOG.warn("[Containers] dropped world interaction (active {})", active);
             return ServerProbes.NOTHING;
         }
-        if (!onMainThread()) return send;
+        if (!multiplexer.onMainThread()) return send;
 
         if (!active.isPlayerInventory()) multiplexer.pauseActiveForWorldUse(); // the server closes it anyway; may drop
                                                                                // a loaded cursor
@@ -194,7 +190,7 @@ public abstract class ExecutionContext implements Scope {
         }
 
         if (cls != PayloadEffect.NEUTRAL) noteServerDependentSend();
-        if (cls == PayloadEffect.CLOSES_GUI && onMainThread())
+        if (cls == PayloadEffect.CLOSES_GUI && multiplexer.onMainThread())
             return followedBy(send, multiplexer::reconcileWithServer);
         return send;
     }

@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.context;
+package com.sbancuz.offscreen.container.routing;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +17,7 @@ import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
  * Screen changes the view's GUI asks for are the view's to apply; what must not
  * happen while the GUI runs is collected here and applied once the run is over.
  */
-public class ViewContext extends ExecutionContext {
+public final class ViewScope extends RoutingScope {
 
     private final ScreenView view;
     private final boolean forActiveView;
@@ -27,7 +27,8 @@ public class ViewContext extends ExecutionContext {
     /** The run sent packets that act on the server's open container or mod payloads. */
     private boolean serverDependent;
 
-    ViewContext(final ServerContainerMultiplexer multiplexer, final ScreenView view, final boolean appliesDeferred) {
+    public ViewScope(final ServerContainerMultiplexer multiplexer, final ScreenView view,
+        final boolean appliesDeferred) {
         super(multiplexer);
         this.view = view;
         this.forActiveView = view.isActiveView();
@@ -38,6 +39,8 @@ public class ViewContext extends ExecutionContext {
     @Override
     public void restore() {
         super.restore();
+        // what the server opens in reply, before it confirms the order, belongs to this view
+        if (serverDependent) multiplexer.attributeArrivalsTo(view);
         if (appliesDeferred) afterRun.forEach(Runnable::run);
     }
 
@@ -59,10 +62,6 @@ public class ViewContext extends ExecutionContext {
     @Override
     void noteServerDependentSend() {
         serverDependent = true;
-    }
-
-    boolean passedServerDependentTraffic() {
-        return serverDependent;
     }
 
     @Override

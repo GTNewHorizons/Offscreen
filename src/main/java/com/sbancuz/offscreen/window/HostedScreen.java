@@ -6,12 +6,15 @@ import javax.annotation.Nullable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.inventory.GuiContainer;
+import net.minecraft.inventory.Container;
 
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.container.ScreenView;
 import com.sbancuz.offscreen.container.ServerContainer;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.scope.Scope;
+import com.sbancuz.offscreen.scope.ScreenScope;
 
 /** One entry of a hosted window's stack: a host UI, and the view it is for the container multiplexer. */
 public final class HostedScreen<T extends HostUI> implements ScreenView {
@@ -95,6 +98,17 @@ public final class HostedScreen<T extends HostUI> implements ScreenView {
 
     // ================================================================== the entry as a view
 
+    /**
+     * While the entry runs, Minecraft's globals are its screen, the window's size, and as {@code openContainer} its
+     * own container, else the gating one, else the inventory.
+     */
+    ScreenScope screenScope() {
+        Container open = mc.thePlayer.inventoryContainer;
+        if (screen() instanceof GuiContainer gc) open = gc.inventorySlots;
+        else if (gatingContainer() instanceof ServerContainer b) open = b.clientContainer;
+        return new ScreenScope(multiplexer.mainWindow, screen(), open, window.getPixelWidth(), window.getPixelHeight());
+    }
+
     @Override
     public @Nullable ServerContainer gatingContainer() {
         final HostedScreen<?> base = window.stack()
@@ -137,7 +151,7 @@ public final class HostedScreen<T extends HostUI> implements ScreenView {
     public void onDisplayRequested(@Nullable final GuiScreen s, final Consumer<GuiScreen> vanilla) {
         mc.currentScreen = s;
         if (s == null) onCloseRequested(true);
-        else multiplexer.contexts.current()
+        else multiplexer.routing()
             .runAfterScope(
                 () -> window.stack()
                     .applyDisplayRequest(this, s));
@@ -145,7 +159,7 @@ public final class HostedScreen<T extends HostUI> implements ScreenView {
 
     @Override
     public void onCloseRequested(final boolean packet) {
-        multiplexer.contexts.current()
+        multiplexer.routing()
             .runAfterScope(() -> close(packet));
     }
 

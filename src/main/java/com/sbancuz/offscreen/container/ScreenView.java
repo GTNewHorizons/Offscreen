@@ -4,10 +4,7 @@ import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.inventory.GuiContainer;
-import net.minecraft.inventory.Container;
 
 import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
 
@@ -67,12 +64,5 @@ public interface ScreenView extends ArrivalTarget {
     default PayloadEffect effectOfUnknownPayload() {
         if (gatingContainer() == null) return PayloadEffect.OPENS_GUI;
         return PayloadEffect.ACTS_ON_OPEN_CONTAINER;
-    }
-
-    /** {@code openContainer} while the view runs: its own container, else the gating one, else the inventory. */
-    default Container containerForGlobals() {
-        if (screen() instanceof GuiContainer gc) return gc.inventorySlots;
-        if (gatingContainer() instanceof ServerContainer b) return b.clientContainer;
-        return Minecraft.getMinecraft().thePlayer.inventoryContainer;
     }
 }

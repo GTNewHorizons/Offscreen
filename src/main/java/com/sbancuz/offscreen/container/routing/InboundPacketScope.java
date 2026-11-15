@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.context;
+package com.sbancuz.offscreen.container.routing;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +23,8 @@ import net.minecraft.network.play.server.S3APacketTabComplete;
 import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
 import com.sbancuz.offscreen.container.ServerContainer;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.ScopePipeline;
+import com.sbancuz.offscreen.scope.ScreenScope;
 import com.sbancuz.offscreen.window.HostedScreen;
 import com.sbancuz.offscreen.window.HostedStack;
 
@@ -31,7 +33,7 @@ import com.sbancuz.offscreen.window.HostedStack;
  * container is checked before the handler; screens the handler shows are placed in a window;
  * containers the server opened are recorded after it.
  */
-public final class InboundPacketContext extends ExecutionContext {
+public final class InboundPacketScope extends RoutingScope {
 
     /** A container screen with a new container, shown by the handler. */
     private record Arrival(GuiContainer screen, Runnable afterBind) {}
@@ -48,7 +50,7 @@ public final class InboundPacketContext extends ExecutionContext {
     private boolean unexplainedWindow;
     private final List<Arrival> arrivals = new ArrayList<>(0);
 
-    public InboundPacketContext(final ServerContainerMultiplexer multiplexer, final Packet packet) {
+    public InboundPacketScope(final ServerContainerMultiplexer multiplexer, final Packet packet) {
         super(multiplexer);
         this.packet = packet;
         this.respawn = packet instanceof S07PacketRespawn;
@@ -59,30 +61,20 @@ public final class InboundPacketContext extends ExecutionContext {
     public void handle(final Runnable handler) {
         if (consumedAsEvidence()) return;
 
+        // the handler sees what a single-window client would: the screen of the active container's view and the
+        // active container as Minecraft's globals
+        final ScreenScope singleWindow = new ScreenScope(
+            multiplexer.mainWindow,
+            multiplexer.screenForInboundHandlers(),
+            multiplexer.activeContainer().clientContainer);
         boolean ok = false;
         try {
-            run(handler);
+            ScopePipeline.of(this, singleWindow)
+                .run(handler);
             ok = true;
         } finally {
             afterHandler(ok);
         }
-    }
-
-    /**
-     * The handler sees what a single-window client would: the screen of the active container's view and the
-     * active container as Minecraft's globals.
-     */
-    @Override
-    public void enter() {
-        final GuiScreen screen = multiplexer.screenForInboundHandlers();
-        multiplexer.globals.lend(screen, multiplexer.activeContainer().clientContainer);
-        super.enter();
-    }
-
-    @Override
-    public void restore() {
-        super.restore();
-        multiplexer.globals.giveBack();
     }
 
     @Override

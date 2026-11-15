@@ -16,7 +16,7 @@ import com.sbancuz.offscreen.compat.ModCompat;
 import com.sbancuz.offscreen.container.ServerContainer;
 import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.container.ServerProbes;
-import com.sbancuz.offscreen.container.context.HostedViewContext;
+import com.sbancuz.offscreen.container.routing.ViewScope;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.integration.nei.NeiScope;
 import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
@@ -35,8 +35,6 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
     private final Window window;
     private final ScopePipeline windowScopes;
 
-    /** The entry whose code runs now. */
-    private @Nullable HostedScreen<?> running;
     /** The last entry was removed: the window has nothing left to show. */
     private boolean emptied;
 
@@ -49,11 +47,12 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
             .build();
     }
 
+    /** The container screen of the entry whose code runs now, for NEI. */
     private @Nullable GuiContainer resolveCurrentContainer() {
-        final HostedScreen<?> t = running != null ? running : isEmpty() ? null : top();
-        if (t == null) return null;
-        final GuiScreen gs = t.screen();
-        return gs instanceof GuiContainer gc ? gc : null;
+        final GuiScreen running = multiplexer.routing()
+            .view()
+            .screen();
+        return running instanceof GuiContainer gc ? gc : null;
     }
 
     public @Nullable HostedScreen<?> findEntry(final GuiScreen screen) {
@@ -88,30 +87,21 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
     }
 
     /**
-     * The scopes of a run, outermost first: the entry's view (who the code acts for, Minecraft's GUI globals),
-     * the window's (lwjgl input, NEI), the UI's own. Screen changes the entry's GUI asks for meanwhile are applied
+     * The scopes of a run, outermost first: the entry's view (who the code acts for), its screen (Minecraft's GUI
+     * globals), the window's (lwjgl input, NEI), the UI's own. Screen changes the entry's GUI asks for meanwhile are
+     * applied
      * when the view's scope ends, unless {@code applyRequests} is false (layout, disposal).
      */
     private void runScoped(final HostedScreen<?> entry, final boolean applyRequests,
         final Consumer<HostedScreen<?>> action) {
         // hosted screens live in a world; between its unload and the windows closing nothing runs
         if (!multiplexer.isInWorld()) return;
-        final HostedViewContext view = new HostedViewContext(
-            multiplexer,
-            entry,
-            window.getPixelWidth(),
-            window.getPixelHeight(),
-            applyRequests);
-        final HostedScreen<?> outer = running;
-        running = entry;
-
+        final ViewScope view = new ViewScope(multiplexer, entry, applyRequests);
         try {
-            ScopePipeline.of(view, windowScopes, entry.scope())
+            ScopePipeline.of(view, entry.screenScope(), windowScopes, entry.scope())
                 .run(() -> action.accept(entry));
         } catch (final Throwable t) {
             Offscreen.LOG.error("[Offscreen] scoped action failed", t);
-        } finally {
-            running = outer;
         }
     }
 

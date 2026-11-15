@@ -46,7 +46,7 @@ final class ContainerSwitch {
             return;
         }
 
-        final Slot park = multiplexer.findParkingSlot(from, cursor)
+        final Slot park = from.findParkingSlot(cursor)
             .orElseThrow(); // checked before the switch started
         final ItemStack stack = cursor.copy();
         parkIndex = park.getSlotIndex();
@@ -145,14 +145,14 @@ final class ContainerSwitch {
     /** The switch is over and the multiplexer is idle again. */
     private void settle(final boolean ok) {
         final ServerContainer f = multiplexer.activeContainer();
-        if (!f.isPlayerInventory()) multiplexer.setState(f, State.OPEN);
+        if (!f.isPlayerInventory()) f.setState(State.OPEN);
         multiplexer.switchEnded();
         notifyDone(ok);
     }
 
     /** Ends the transaction; a target that was not reached is paused again. */
     void notifyDone(final boolean ok) {
-        if (to.state == State.REOPENING) multiplexer.setState(to, State.PAUSED);
+        if (to.state == State.REOPENING) to.setState(State.PAUSED);
         done.accept(ok);
     }
 }
