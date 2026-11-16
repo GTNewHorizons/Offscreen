@@ -36,7 +36,6 @@ public class LateMixinsLoader implements ILateMixinLoader {
             mixins.add("ClientScreenHandlerMixin");
             mixins.add("NetworkHandlerMixin");
 
-            // the container multiplexer, and the render state of hosted screens
             mixins.add("Mui2ServerCloseMixin");
             mixins.add("OverlayStackAccessor");
             mixins.add("StencilAccessor");

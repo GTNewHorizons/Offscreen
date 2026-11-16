@@ -69,8 +69,6 @@ public final class ServerProbes {
         return ++muxTid;
     }
 
-    // ================================================================== sending (6)
-
     /** Sends a click the server answers only while its window is open there, and waits for the answer. */
     void sendTracked(final C0EPacketClickWindow click, final ArrivalCause cause, final Consumer<Boolean> onAnswer,
         final Runnable onNever) {
@@ -161,8 +159,6 @@ public final class ServerProbes {
         }, onNever);
     }
 
-    // ================================================================== answers
-
     /** An S32. Returns false when it answers no probe of ours. */
     public boolean onConfirmTransaction(final int w, final short tid, final boolean accepted) {
         for (final PendingProbe e : pending) {
@@ -210,8 +206,6 @@ public final class ServerProbes {
         while (!pending.isEmpty() && pending.get(0).seq < limit) gone.add(pending.remove(0));
         for (final PendingProbe e : gone) if (e.epoch == epoch) e.onNever.run();
     }
-
-    // ================================================================== what caused a GUI the server opens
 
     /** The interaction of the oldest unanswered probe sent after a world interaction; NONE without one. */
     OpeningInteraction pendingInteraction() {

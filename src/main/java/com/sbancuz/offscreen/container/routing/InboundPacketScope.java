@@ -97,8 +97,6 @@ public final class InboundPacketScope extends RoutingScope {
         needsReconcile = true;
     }
 
-    // ================================================================== what the packet tells
-
     /** Returns true if the packet was an answer of ours and is consumed. */
     private boolean consumedAsEvidence() {
         if (packet instanceof S32PacketConfirmTransaction s) return answersProbe(s);
@@ -138,9 +136,7 @@ public final class InboundPacketScope extends RoutingScope {
     private void afterHandler(final boolean ok) {
         try {
             postHandle();
-            if (!ok && multiplexer.knowsServerState() && !multiplexer.isIdle()) multiplexer.resetToPlayerInventory(); // the
-                                                                                                                      // handler
-                                                                                                                      // failed
+            if (!ok && multiplexer.knowsServerState() && !multiplexer.isIdle()) multiplexer.resetToPlayerInventory();
         } catch (final Throwable t) {
             ServerContainerMultiplexer.LOG.error("[Containers] inbound post-handling failed", t);
         }
@@ -164,8 +160,6 @@ public final class InboundPacketScope extends RoutingScope {
         if (unexplainedWindow) multiplexer.resetToPlayerInventory();
         if (packet instanceof S06PacketUpdateHealth h && h.func_149332_c() <= 0f) multiplexer.onDeath();
     }
-
-    // ================================================================== screens the handler shows
 
     @Override
     public void displayScreen(@Nullable final GuiScreen s, final Consumer<GuiScreen> vanilla) {

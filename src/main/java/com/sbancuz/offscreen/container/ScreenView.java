@@ -7,10 +7,12 @@ import javax.annotation.Nullable;
 import net.minecraft.client.gui.GuiScreen;
 
 import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.window.HostedScreen;
+import com.sbancuz.offscreen.window.MainWindow;
 
 /**
- * A screen in a place: the main window ({@link com.sbancuz.offscreen.window.MainWindow}),
- * or an entry of a hosted window's stack ({@link com.sbancuz.offscreen.window.HostedScreen}).
+ * A screen in a place: the main window ({@link MainWindow}),
+ * or an entry of a hosted window's stack ({@link HostedScreen}).
  * Nothing about a view is stored: whether it shows a container, a free screen or a child is derived from the
  * screen's container and the place around it every time, so the model cannot go stale. A view
  * is also a place a GUI the server opens can be shown in.

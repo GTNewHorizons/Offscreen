@@ -1,6 +1,7 @@
 package com.sbancuz.offscreen.mixins.early;
 
 import net.minecraft.client.gui.inventory.GuiContainer;
+import net.minecraft.inventory.Slot;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
@@ -28,5 +29,5 @@ public interface GuiContainerAccessor {
     void setGuiTop(final int t);
 
     @Invoker("getSlotAtPosition")
-    net.minecraft.inventory.Slot offscreen$getSlotAtPosition(int x, int y);
+    Slot offscreen$getSlotAtPosition(int x, int y);
 }

@@ -85,8 +85,6 @@ public final class MainWindow implements ScreenView {
         return covered;
     }
 
-    // ================================================================== input and updates
-
     /** Whether runTick is handling the main window's own screen, in a world. */
     private boolean handlesOwnScreen(final GuiScreen screen) {
         return !globalsBorrowed() && screen == mc.currentScreen && multiplexer.isInWorld();
@@ -130,8 +128,6 @@ public final class MainWindow implements ScreenView {
         multiplexer.overlay.draw(this, event.gui.width, event.gui.height);
     }
 
-    // ================================================================== moving screens between windows
-
     public boolean isMoveKey(final int keyCode) {
         return keyCode == moveKey.getKeyCode();
     }
@@ -157,7 +153,6 @@ public final class MainWindow implements ScreenView {
         syncOpenContainer();
         for (final GuiScreen g : moving) w.stack()
             .pushScreen(g);
-        // the main window is the game again
         if (Display.isActive() && !mc.inGameHasFocus) mc.setIngameFocus();
         restoreIngameFocus();
         return true;
@@ -198,8 +193,6 @@ public final class MainWindow implements ScreenView {
         if (multiplexer.containerOf(before) != null && multiplexer.isFreeScreen(s)) covered = before;
         return true;
     }
-
-    // ================================================================== the main window as a view
 
     /** Its own container, or for a free screen over a covered one the covered one's. */
     @Override
@@ -262,8 +255,6 @@ public final class MainWindow implements ScreenView {
         showUnrouted(s);
         return ServerProbes.NOTHING;
     }
-
-    // ================================================================== screen changes
 
     /** Changes the screen as the multiplexer: vanilla side effects on the real main-window state, no routing. */
     public void showUnrouted(@Nullable final GuiScreen s) {

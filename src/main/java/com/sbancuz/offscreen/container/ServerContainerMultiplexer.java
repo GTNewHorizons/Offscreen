@@ -124,8 +124,6 @@ public final class ServerContainerMultiplexer {
         adapters.add(0, adapter);
     }
 
-    // ================================================================== who the running code acts for
-
     public boolean onMainThread() {
         final Thread t = mainThread;
         return t == null || Thread.currentThread() == t;
@@ -145,8 +143,6 @@ public final class ServerContainerMultiplexer {
         routing = scope;
         return replaced;
     }
-
-    // ================================================================== choke points (5)
 
     /** {@code Minecraft.displayGuiScreen}. */
     public void onDisplayGuiScreen(@Nullable final GuiScreen incoming, final Consumer<GuiScreen> vanilla) {
@@ -205,8 +201,6 @@ public final class ServerContainerMultiplexer {
     public boolean allowsClientCloseLogic(final Container c) {
         return !isInWorld() || containerOf(c) == null && !closeLogicRan.contains(c);
     }
-
-    // ================================================================== model queries
 
     /** Whether the multiplexer runs: joined, with a player and a world. */
     public boolean isInWorld() {
@@ -302,8 +296,6 @@ public final class ServerContainerMultiplexer {
         return null;
     }
 
-    // ================================================================== views
-
     /** Every hosted entry, bottom to top in each window. */
     public List<HostedScreen<?>> hostedScreens() {
         final List<HostedScreen<?>> out = new ArrayList<>();
@@ -334,8 +326,6 @@ public final class ServerContainerMultiplexer {
         return viewOf(b).map(ScreenView::screen)
             .orElse(mc.currentScreen);
     }
-
-    // ================================================================== sending
 
     /** Sends a packet as the multiplexer: it passes unchecked. */
     public void sendAsMultiplexer(final Packet p) {
@@ -410,8 +400,6 @@ public final class ServerContainerMultiplexer {
     void noteProgress() {
         stall = 0;
     }
-
-    // ================================================================== procedures (8)
 
     /** Runs {@code r} the next time the active container is HELD and ready. */
     void whenIdle(final Runnable r) {
@@ -700,8 +688,6 @@ public final class ServerContainerMultiplexer {
         else closeContainer(b);
     }
 
-    // ================================================================== switching the open container
-
     /**
      * Starts switching the server's open container from the active one to {@code to}. Returns
      * {@link OverlayHint#NONE} when it started, else why it was refused; then nothing was sent
@@ -732,8 +718,6 @@ public final class ServerContainerMultiplexer {
         if (!to.canReopenNow()) return OverlayHint.CANNOT_REOPEN;
         return OverlayHint.NONE;
     }
-
-    // ================================================================== world interactions and API opens
 
     /** Right click on a block or entity, item use, horse inventory request. Returns true to cancel it. */
     public boolean onWorldUse(final boolean horse) {
@@ -797,8 +781,6 @@ public final class ServerContainerMultiplexer {
         });
     }
 
-    // ================================================================== lifecycle
-
     /** S01: tests whether the server answers barriers, then the inventory is the active container. */
     private void onJoin() {
         forgetEverything();
@@ -848,7 +830,6 @@ public final class ServerContainerMultiplexer {
         for (final ServerContainer b : openContainers.values()) b.state = State.CLOSED;
         openContainers.clear();
 
-        // every procedure is forgotten
         deferred.clear();
         probes = new ServerProbes(this);
         runningSwitch = null;

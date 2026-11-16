@@ -21,7 +21,6 @@ public class MuiScope implements Scope {
 
     private final ModularScreen screen;
 
-    // the global ModularUI2 state saved on enter
     private ModularScreen savedCurrentScreen;
     private IMuiScreen savedLastMui;
     private ObjectArrayList<IMuiScreen> savedMuiStack;
@@ -37,7 +36,6 @@ public class MuiScope implements Scope {
 
     @Override
     public void enter() {
-        // save everything first
         final ModularScreen cur = ClientScreenHandlerAccessor.getCurrentScreenMui();
         final IMuiScreen last = ClientScreenHandlerAccessor.getLastMui();
         final ObjectArrayList<IMuiScreen> stack = ClientScreenHandlerAccessor.getMuiStack();
@@ -54,7 +52,6 @@ public class MuiScope implements Scope {
         savedStencilValue = StencilAccessor.offscreen$getStencilValue();
         entered = true;
 
-        // then apply
         ClientScreenHandlerAccessor.setCurrentScreenMui(screen);
         ClientScreenHandlerAccessor.setLastMui(screen.getScreenWrapper());
         stack.clear();

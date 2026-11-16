@@ -53,7 +53,6 @@ public class EarlyMixinsLoader implements IFMLLoadingPlugin, IEarlyMixinLoader {
             mixins.add("EntityRendererFocus");
             mixins.add("MinecraftAccessor");
 
-            // the container multiplexer's hooks
             mixins.add("NetworkManagerMixin");
             mixins.add("MinecraftMixin");
             mixins.add("GuiContainerMixin");

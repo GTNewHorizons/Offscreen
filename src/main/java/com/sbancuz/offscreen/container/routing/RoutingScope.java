@@ -104,8 +104,6 @@ public abstract class RoutingScope implements Scope {
         return enclosing.view();
     }
 
-    // ================================================================== outbound packets and clicks
-
     /** What to do with an outbound packet sent from here: {@code send}, nothing, or send and a follow-up. */
     public final Runnable routeOutbound(final Packet p, final Runnable send) {
         if (blocksOutbound()) return ServerProbes.NOTHING;
@@ -169,8 +167,8 @@ public abstract class RoutingScope implements Scope {
         }
         if (!multiplexer.onMainThread()) return send;
 
-        if (!active.isPlayerInventory()) multiplexer.pauseActiveForWorldUse(); // the server closes it anyway; may drop
-                                                                               // a loaded cursor
+        // the server closes it anyway; may drop a loaded cursor
+        if (!active.isPlayerInventory()) multiplexer.pauseActiveForWorldUse();
         final OpeningInteraction o = OpeningInteraction.fromPacket(p);
         return followedBy(
             send,

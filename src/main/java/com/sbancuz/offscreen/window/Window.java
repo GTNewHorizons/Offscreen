@@ -343,7 +343,6 @@ public final class Window {
                         if ((key.mod() & SDLKeycode.SDL_KMOD_CTRL) != 0) {
                             c = (char) (sdlKeyCode & 0x1f);
                         }
-                        // Debug aid for a->s shift: log mismatches between scancode-derived and keycode
                         if (rawKeyCode != sdlKeyCode && rawKeyCode >= 32
                             && rawKeyCode <= 126
                             && sdlKeyCode >= 32

@@ -3,6 +3,7 @@ package com.sbancuz.offscreen.integration.nei;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -26,6 +27,7 @@ import com.sbancuz.offscreen.scope.Scope;
 import codechicken.nei.BookmarkPanel;
 import codechicken.nei.Button;
 import codechicken.nei.ButtonCycled;
+import codechicken.nei.FastTransferManager;
 import codechicken.nei.ItemList;
 import codechicken.nei.ItemList.ItemsLoadedCallback;
 import codechicken.nei.ItemPanel;
@@ -37,6 +39,9 @@ import codechicken.nei.RestartableTask;
 import codechicken.nei.SearchField;
 import codechicken.nei.SubsetWidget;
 import codechicken.nei.Widget;
+import codechicken.nei.api.GuiInfo;
+import codechicken.nei.api.INEIGuiHandler;
+import codechicken.nei.api.IRecipeOverlayRenderer;
 import codechicken.nei.api.ItemFilter;
 import codechicken.nei.bookmark.BookmarkStorage;
 import codechicken.nei.guihook.GuiContainerManager;
@@ -179,14 +184,14 @@ public final class NeiScope implements Scope {
             return;
         }
 
-        // The view's own state persists between runs.
         own.capture();
         own.captureViewState();
         saved.apply();
         saved.applyViewState();
         NEIController.manager = saved.manager;
 
-        // Main window should not try to resize the bookmark panel, so NEI doesn't create confusion for the highlighted slot
+        // Main window should not try to resize the bookmark panel, so NEI doesn't create confusion for the highlighted
+        // slot
         final GuiContainer mainContainer = mainWindowContainer.get();
         if (mainContainer != null) saved.bookmarkPanel.resize(mainContainer);
         saved.manager = null;
@@ -260,15 +265,15 @@ public final class NeiScope implements Scope {
         private Set<Widget> drawWidgets;
         private Set<Widget> controlWidgets;
         // per-view NEI statics beyond the layout widgets
-        private codechicken.nei.FastTransferManager fastTransferManager;
-        private codechicken.nei.api.IRecipeOverlayRenderer overlayRenderer;
+        private FastTransferManager fastTransferManager;
+        private IRecipeOverlayRenderer overlayRenderer;
         /** GUIs registered as NEI GUI handlers by the view, cleared on close. */
-        private java.util.List<codechicken.nei.api.INEIGuiHandler> guiHandlers = new java.util.ArrayList<>();
+        private List<INEIGuiHandler> guiHandlers = new ArrayList<>();
 
         void resetViewState() {
             fastTransferManager = null;
             overlayRenderer = null;
-            guiHandlers = new java.util.ArrayList<>();
+            guiHandlers = new ArrayList<>();
         }
 
         void captureViewState() {
@@ -276,14 +281,14 @@ public final class NeiScope implements Scope {
             overlayRenderer = LayoutManager.overlayRenderer;
 
             // the GUI handlers that are containers belong to the view, the rest are global
-            final java.util.List<codechicken.nei.api.INEIGuiHandler> list = new java.util.ArrayList<>();
-            codechicken.nei.api.GuiInfo.readLock.lock();
+            final List<INEIGuiHandler> list = new ArrayList<>();
+            GuiInfo.readLock.lock();
             try {
-                for (final codechicken.nei.api.INEIGuiHandler h : codechicken.nei.api.GuiInfo.guiHandlers) {
+                for (final INEIGuiHandler h : GuiInfo.guiHandlers) {
                     if (h instanceof GuiContainer) list.add(h);
                 }
             } finally {
-                codechicken.nei.api.GuiInfo.readLock.unlock();
+                GuiInfo.readLock.unlock();
             }
             guiHandlers = list;
         }
@@ -293,12 +298,12 @@ public final class NeiScope implements Scope {
             LayoutManager.overlayRenderer = overlayRenderer;
 
             // swap only the container handlers (see captureViewState)
-            codechicken.nei.api.GuiInfo.writeLock.lock();
+            GuiInfo.writeLock.lock();
             try {
-                codechicken.nei.api.GuiInfo.guiHandlers.removeIf(h -> h instanceof GuiContainer);
-                codechicken.nei.api.GuiInfo.guiHandlers.addAll(guiHandlers);
+                GuiInfo.guiHandlers.removeIf(h -> h instanceof GuiContainer);
+                GuiInfo.guiHandlers.addAll(guiHandlers);
             } finally {
-                codechicken.nei.api.GuiInfo.writeLock.unlock();
+                GuiInfo.writeLock.unlock();
             }
         }
 

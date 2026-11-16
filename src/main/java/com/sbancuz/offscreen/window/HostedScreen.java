@@ -96,8 +96,6 @@ public final class HostedScreen<T extends HostUI> implements ScreenView {
         multiplexer.gatedInput.handleInput(this, ui::handleInput);
     }
 
-    // ================================================================== the entry as a view
-
     /**
      * While the entry runs, Minecraft's globals are its screen, the window's size, and as {@code openContainer} its
      * own container, else the gating one, else the inventory.

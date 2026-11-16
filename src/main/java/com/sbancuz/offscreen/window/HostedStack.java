@@ -46,6 +46,7 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
             .ifMod(ModCompat.NEI, () -> new NeiScope(this::resolveCurrentContainer, this::resolveMainWindowContainer))
             .build();
     }
+
     private @Nullable GuiContainer resolveMainWindowContainer() {
         return multiplexer.mainWindow.screen() instanceof GuiContainer gc ? gc : null;
     }
@@ -79,8 +80,6 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         return emptied && isEmpty();
     }
 
-    // ================================================================== running an entry's code
-
     /**
      * Runs {@code action} on the top screen in its scopes, so that Minecraft's globals, lwjgl's input and the
      * statics of other mods are that screen's, as they are the main window's for a main-window screen.
@@ -107,8 +106,6 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
             Offscreen.LOG.error("[Offscreen] scoped action failed", t);
         }
     }
-
-    // ================================================================== changing the stack
 
     public HostedScreen<?> pushUI(final HostUI ui) {
         final HostedScreen<?> e = new HostedScreen<>(window, ui);

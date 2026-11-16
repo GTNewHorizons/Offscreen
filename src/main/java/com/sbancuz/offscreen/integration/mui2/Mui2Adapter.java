@@ -50,8 +50,6 @@ public final class Mui2Adapter implements ContainerAdapter {
 
     private Mui2Adapter() {}
 
-    // ------------------------------------------------------------------ hooks from the late mixins
-
     public static void sending(@Nullable final IPacket p) {
         SENDING.set(p);
     }
@@ -74,8 +72,6 @@ public final class Mui2Adapter implements ContainerAdapter {
         final Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null || mc.theWorld == null) ModularNetwork.CLIENT.closeAll();
     }
-
-    // ------------------------------------------------------------------ ContainerAdapter
 
     @Override
     public boolean handles(final GuiScreen screen) {

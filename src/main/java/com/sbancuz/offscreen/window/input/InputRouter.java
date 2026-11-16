@@ -57,7 +57,7 @@ public final class InputRouter {
 
     private void updateGlobalKeyState(final short scancode, final boolean down) {
         if (savedKeyArray == null) return;
-        final ByteBuffer shadow = org.lwjglx.input.Keyboard.sdlKeyPressedArray;
+        final ByteBuffer shadow = Keyboard.sdlKeyPressedArray;
         if (shadow == null || scancode < 0 || scancode >= shadow.capacity()) return;
         shadow.put(scancode, (byte) (down ? 1 : 0));
         if (down) {

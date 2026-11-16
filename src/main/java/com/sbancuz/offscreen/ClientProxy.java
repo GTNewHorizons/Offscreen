@@ -28,7 +28,6 @@ public class ClientProxy extends CommonProxy {
             .register(Driver.INSTANCE);
         Driver.INSTANCE.mainWindow.register();
 
-        // Keeps several server-backed container GUIs open across windows.
         ServerContainerMultiplexer.INSTANCE.init(Driver.INSTANCE.mainWindow);
         if (ModCompat.NEI.isLoaded()) ServerContainerMultiplexer.INSTANCE.registerAdapter(NeiAdapter.INSTANCE);
 
