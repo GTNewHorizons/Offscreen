@@ -3,6 +3,7 @@ package com.sbancuz.offscreen.integration.nei;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -26,6 +27,7 @@ import com.sbancuz.offscreen.scope.Scope;
 import codechicken.nei.BookmarkPanel;
 import codechicken.nei.Button;
 import codechicken.nei.ButtonCycled;
+import codechicken.nei.FastTransferManager;
 import codechicken.nei.ItemList;
 import codechicken.nei.ItemList.ItemsLoadedCallback;
 import codechicken.nei.ItemPanel;
@@ -37,6 +39,9 @@ import codechicken.nei.RestartableTask;
 import codechicken.nei.SearchField;
 import codechicken.nei.SubsetWidget;
 import codechicken.nei.Widget;
+import codechicken.nei.api.GuiInfo;
+import codechicken.nei.api.INEIGuiHandler;
+import codechicken.nei.api.IRecipeOverlayRenderer;
 import codechicken.nei.api.ItemFilter;
 import codechicken.nei.bookmark.BookmarkStorage;
 import codechicken.nei.guihook.GuiContainerManager;
@@ -66,6 +71,7 @@ public final class NeiScope implements Scope {
     }
 
     private final Supplier<GuiContainer> containerSupplier;
+    private final Supplier<GuiContainer> mainWindowContainer;
     private final Ctx own = new Ctx();
     private final Ctx saved = new Ctx();
     private int enteredCount = 0;
@@ -96,8 +102,9 @@ public final class NeiScope implements Scope {
     };
     private final AtomicReference<ArrayList<ItemStack>> filteredItems = new AtomicReference<>();
 
-    public NeiScope(final Supplier<GuiContainer> containerSupplier) {
+    public NeiScope(final Supplier<GuiContainer> containerSupplier, final Supplier<GuiContainer> mainWindowContainer) {
         this.containerSupplier = containerSupplier;
+        this.mainWindowContainer = mainWindowContainer;
 
         saved.capture();
         saved.manager = NEIController.manager;
@@ -116,6 +123,7 @@ public final class NeiScope implements Scope {
         LayoutManager.itemZoom = new InertItemZoom();
 
         own.capture();
+        own.resetViewState();
 
         GuiContainerManager.inputHandlers.remove(own.itemZoom);
         synchronized (ItemList.itemFilterers) {
@@ -138,6 +146,7 @@ public final class NeiScope implements Scope {
 
         saved.capture();
         saved.manager = NEIController.manager;
+        saved.captureViewState();
 
         final GuiContainer container = containerSupplier.get();
         if (container != null) {
@@ -146,6 +155,7 @@ public final class NeiScope implements Scope {
 
         NEIController.manager = own.manager;
         own.apply();
+        own.applyViewState();
         LayoutManager.bookmarkPanel.update();
 
         if (container != null) {
@@ -174,8 +184,16 @@ public final class NeiScope implements Scope {
             return;
         }
 
+        own.capture();
+        own.captureViewState();
         saved.apply();
+        saved.applyViewState();
         NEIController.manager = saved.manager;
+
+        // Main window should not try to resize the bookmark panel, so NEI doesn't create confusion for the highlighted
+        // slot
+        final GuiContainer mainContainer = mainWindowContainer.get();
+        if (mainContainer != null) saved.bookmarkPanel.resize(mainContainer);
         saved.manager = null;
         saved.clear();
     }
@@ -246,6 +264,48 @@ public final class NeiScope implements Scope {
         private Widget inputFocused;
         private Set<Widget> drawWidgets;
         private Set<Widget> controlWidgets;
+        // per-view NEI statics beyond the layout widgets
+        private FastTransferManager fastTransferManager;
+        private IRecipeOverlayRenderer overlayRenderer;
+        /** GUIs registered as NEI GUI handlers by the view, cleared on close. */
+        private List<INEIGuiHandler> guiHandlers = new ArrayList<>();
+
+        void resetViewState() {
+            fastTransferManager = null;
+            overlayRenderer = null;
+            guiHandlers = new ArrayList<>();
+        }
+
+        void captureViewState() {
+            fastTransferManager = NEIController.fastTransferManager;
+            overlayRenderer = LayoutManager.overlayRenderer;
+
+            // the GUI handlers that are containers belong to the view, the rest are global
+            final List<INEIGuiHandler> list = new ArrayList<>();
+            GuiInfo.readLock.lock();
+            try {
+                for (final INEIGuiHandler h : GuiInfo.guiHandlers) {
+                    if (h instanceof GuiContainer) list.add(h);
+                }
+            } finally {
+                GuiInfo.readLock.unlock();
+            }
+            guiHandlers = list;
+        }
+
+        void applyViewState() {
+            NEIController.fastTransferManager = fastTransferManager;
+            LayoutManager.overlayRenderer = overlayRenderer;
+
+            // swap only the container handlers (see captureViewState)
+            GuiInfo.writeLock.lock();
+            try {
+                GuiInfo.guiHandlers.removeIf(h -> h instanceof GuiContainer);
+                GuiInfo.guiHandlers.addAll(guiHandlers);
+            } finally {
+                GuiInfo.writeLock.unlock();
+            }
+        }
 
         public void capture() {
             this.itemPanel = ItemPanelsAccessor.getItemPanel();

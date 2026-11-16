@@ -22,6 +22,11 @@ public final class ScopePipeline implements Scope {
         return new Builder();
     }
 
+    /** The scopes of one run, outermost first. */
+    public static ScopePipeline of(final Scope... scopes) {
+        return new ScopePipeline(scopes);
+    }
+
     @Override
     public void enter() {
         int i = 0;

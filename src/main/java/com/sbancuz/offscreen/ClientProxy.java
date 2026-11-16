@@ -8,7 +8,9 @@ import com.sbancuz.offscreen.compat.Mui2Compat;
 import com.sbancuz.offscreen.config.OffscreenDebugConfig;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.debug.DebugKeys;
+import com.sbancuz.offscreen.integration.nei.NeiAdapter;
 import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -25,6 +27,9 @@ public class ClientProxy extends CommonProxy {
             .bus()
             .register(Driver.INSTANCE);
         Driver.INSTANCE.mainWindow.register();
+
+        ServerContainerMultiplexer.INSTANCE.init(Driver.INSTANCE.mainWindow);
+        if (ModCompat.NEI.isLoaded()) ServerContainerMultiplexer.INSTANCE.registerAdapter(NeiAdapter.INSTANCE);
 
         UIRegistry.register(GuiScreen.class, screen -> new VanillaUI((GuiScreen) screen));
 

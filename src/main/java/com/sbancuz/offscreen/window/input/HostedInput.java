@@ -57,16 +57,6 @@ public final class HostedInput implements Scope {
         windowMouse = MOUSE_FIELDS == null ? null : emptyMouseState();
     }
 
-    /** Runs {@code recording} with this window's input live, so lwjgl3ify's own methods record into it. */
-    public void record(final Runnable recording) {
-        enter();
-        try {
-            recording.run();
-        } finally {
-            restore();
-        }
-    }
-
     /** The pointer moved to lwjgl pixel {@code x, y} of the window, y up. */
     public void pointerMoved(final int x, final int y) {
         if (MOUSE_FIELDS == null) return;
@@ -140,6 +130,12 @@ public final class HostedInput implements Scope {
         }
     }
 
+    /** A gated screen takes no key or text: what was recorded for the listeners is dropped. */
+    public void discardListenerEvents() {
+        listenerEvents.clear();
+    }
+
+    /** Inside the scope lwjgl3ify's own methods record into this window's input, and screens read it. */
     @Override
     public void enter() {
         if (depth++ > 0) return;

@@ -14,6 +14,7 @@ public final class Configs {
         try {
             ConfigurationManager.registerConfig(OffscreenConfig.class);
             ConfigurationManager.registerConfig(OffscreenDebugConfig.class);
+            ConfigurationManager.registerConfig(ContainerProtocolConfig.class);
         } catch (Exception ignored) {}
     }
 }

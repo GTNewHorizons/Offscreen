@@ -7,12 +7,10 @@ import com.sbancuz.offscreen.Offscreen;
 
 /**
  * {@link Mui2UI} for a server-synced screen: reuses its wrapper and ticks the sync
- * manager. Lifetime is owned by {@link MuiSyncedSession}; MUI close paths target
+ * manager. Lifetime is owned by its container's record; MUI close paths target
  * the main window, never call them here.
  */
 public class SyncedMui2UI extends Mui2UI {
-
-    private volatile Runnable disposeHook = () -> {};
 
     public SyncedMui2UI(final ModularScreen screen) {
         super(screen);
@@ -20,10 +18,6 @@ public class SyncedMui2UI extends Mui2UI {
             .getGuiScreen() == null) {
             throw new IllegalStateException("Synced MUI screen has no wrapper; use Mui2UI for client-only screens");
         }
-    }
-
-    void setDisposeHook(final Runnable disposeHook) {
-        this.disposeHook = disposeHook;
     }
 
     /** Whether the screen is server-bound and needs this host instead of {@link Mui2UI}. */
@@ -54,8 +48,7 @@ public class SyncedMui2UI extends Mui2UI {
         }
     }
 
+    /** The server session belongs to the container's record; nothing to do here. */
     @Override
-    public void dispose() {
-        disposeHook.run();
-    }
+    public void dispose() {}
 }

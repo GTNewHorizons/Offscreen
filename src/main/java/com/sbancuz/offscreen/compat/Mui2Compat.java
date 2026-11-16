@@ -1,7 +1,6 @@
 package com.sbancuz.offscreen.compat;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;
@@ -10,16 +9,16 @@ import com.cleanroommc.modularui.api.IMuiScreen;
 import com.cleanroommc.modularui.screen.GuiContainerWrapper;
 import com.cleanroommc.modularui.screen.GuiScreenWrapper;
 import com.cleanroommc.modularui.screen.ModularScreen;
-import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.OffscreenAPI;
 import com.sbancuz.offscreen.api.UIRegistry;
+import com.sbancuz.offscreen.integration.mui2.Mui2Adapter;
 import com.sbancuz.offscreen.integration.mui2.Mui2UI;
 import com.sbancuz.offscreen.integration.mui2.SyncedMui2UI;
 import com.sbancuz.offscreen.integration.mui2.TestMui2ScreenNoNEI;
 import com.sbancuz.offscreen.integration.mui2.TestMui2ScreenWithNEI;
 import com.sbancuz.offscreen.integration.mui2.TestSyncedGui;
-import com.sbancuz.offscreen.mixins.late.ClientScreenHandlerAccessor;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.relauncher.Side;
@@ -46,28 +45,15 @@ public final class Mui2Compat {
     @SideOnly(Side.CLIENT)
     public static void registerClient() {
         UIRegistry.register(ModularScreen.class, screen -> hostFor((ModularScreen) screen));
-        // Moves hand over the wrapper GuiScreen, not the ModularScreen.
+        // Server arrivals and moves hand over the wrapper GuiScreen, not the ModularScreen.
         UIRegistry.register(GuiContainerWrapper.class, screen -> hostFor(((IMuiScreen) screen).getScreen()));
         UIRegistry.register(GuiScreenWrapper.class, screen -> hostFor(((IMuiScreen) screen).getScreen()));
+        ServerContainerMultiplexer.INSTANCE.registerAdapter(Mui2Adapter.INSTANCE);
     }
 
     @SideOnly(Side.CLIENT)
     private static HostUI hostFor(final ModularScreen ms) {
-        if (!SyncedMui2UI.isServerBound(ms)) return new Mui2UI(ms);
-        Offscreen.LOG.warn("[Offscreen] server-bound screen hosted without a session; use the factory open overload");
-        return new SyncedMui2UI(ms);
-    }
-
-    /** Client: the screen leaves the main window, so MUI2 must stop treating it as the open one. */
-    @SideOnly(Side.CLIENT)
-    public static void detachFromMainWindow(final GuiScreen screen) {
-        if (!(screen instanceof IMuiScreen mui)) return;
-        if (ClientScreenHandlerAccessor.getCurrentScreenMui() == mui.getScreen()) {
-            ClientScreenHandlerAccessor.setCurrentScreenMui(null);
-        }
-        if (ClientScreenHandlerAccessor.getLastMui() == mui) ClientScreenHandlerAccessor.setLastMui(null);
-        ClientScreenHandlerAccessor.getMuiStack()
-            .remove(mui);
+        return SyncedMui2UI.isServerBound(ms) ? new SyncedMui2UI(ms) : new Mui2UI(ms);
     }
 
     /** Client: registers the MUI2 test keybinds. Debug-gated by the caller. */

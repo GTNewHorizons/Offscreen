@@ -10,8 +10,6 @@ import com.cleanroommc.modularui.screen.ModularScreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.scope.MuiScope;
 import com.sbancuz.offscreen.scope.Scope;
-import com.sbancuz.offscreen.scope.ScopePipeline;
-import com.sbancuz.offscreen.scope.ScreenScope;
 
 public class Mui2UI implements HostUI {
 
@@ -30,10 +28,7 @@ public class Mui2UI implements HostUI {
             this.wrapper = new GuiContainerWrapper(container, screen).getGuiScreen();
         }
 
-        this.scope = ScopePipeline.builder()
-            .always(new ScreenScope(() -> this.wrapper))
-            .always(new MuiScope(this.screen))
-            .build();
+        this.scope = new MuiScope(this.screen);
     }
 
     protected final ModularScreen screen() {

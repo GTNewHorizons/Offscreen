@@ -1,7 +1,5 @@
 package com.sbancuz.offscreen.integration.mui2;
 
-import javax.annotation.Nullable;
-
 import net.minecraft.client.Minecraft;
 
 import com.cleanroommc.modularui.api.IGuiHolder;
@@ -28,27 +26,24 @@ public class OffscreenSimpleFactory extends SimpleGuiFactory {
         super(name, holder(modId, builder));
     }
 
-    /** Opens this GUI in a new offscreen window, or null. */
-    public @Nullable Window openOffscreen() {
+    /**
+     * Opens this GUI in a new offscreen window: the client open
+     * request is sent, and the window is created when the server's open arrives.
+     */
+    public void openOffscreen() {
         final Minecraft mc = Minecraft.getMinecraft();
-        if (mc.theWorld == null || mc.thePlayer == null) return null;
-        final Window window = new Window(getFactoryName());
-        if (!window.isOpen()) return null;
-        if (new MuiSyncedSession(window, this, new GuiData(mc.thePlayer)).isClosed()) return null;
-        return window;
+        if (mc.theWorld == null || mc.thePlayer == null) return;
+        OffscreenAPI.open(getFactoryName(), this::openClient);
     }
 
-    /** Closes the live window for this factory, or opens it. */
-    public @Nullable Window toggleOffscreen() {
-        final MuiSyncedSession existing = MuiSyncedSession.findActive(this);
+    /** Closes the window of this factory, or opens it. */
+    public void toggleOffscreen() {
+        final Window existing = OffscreenAPI.findByTitle(getFactoryName());
         if (existing != null) {
-            // While the open is still in flight the window is blank; key repeats from holding
-            // the toggle key would otherwise open and instantly dispose it (flicker + close).
-            if (existing.isOpening()) return existing.window();
-            existing.dispose();
-            return null;
+            OffscreenAPI.close(existing);
+            return;
         }
-        return openOffscreen();
+        openOffscreen();
     }
 
     /** Builds the main panel on both sides; no client-only references. */

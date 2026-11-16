@@ -1,0 +1,54 @@
+package com.sbancuz.offscreen.scope.container.routing;
+
+import java.util.function.Consumer;
+
+import javax.annotation.Nullable;
+
+import net.minecraft.client.gui.GuiScreen;
+
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.scope.container.ScreenView;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
+
+/** Outside every other scope: the main window, acting for its view while it shows a container screen. */
+public final class MainWindowScope extends RoutingScope {
+
+    public MainWindowScope(final ServerContainerMultiplexer multiplexer) {
+        super(multiplexer);
+    }
+
+    @Override
+    public boolean actsForActiveView() {
+        return multiplexer.mainWindow.isActiveView();
+    }
+
+    @Override
+    boolean blocksOutbound() {
+        return false;
+    }
+
+    @Override
+    PayloadEffect effectOfUnknownPayload() {
+        return multiplexer.mainWindow.effectOfUnknownPayload();
+    }
+
+    @Override
+    public void displayScreen(@Nullable final GuiScreen s, final Consumer<GuiScreen> vanilla) {
+        multiplexer.mainWindow.onDisplayRequested(s, vanilla);
+    }
+
+    @Override
+    public void closeScreen(final boolean packet) {
+        multiplexer.mainWindow.onCloseRequested(packet);
+    }
+
+    @Override
+    public void requestReconcile() {
+        multiplexer.reconcileWithServer();
+    }
+
+    @Override
+    public ScreenView view() {
+        return multiplexer.mainWindow;
+    }
+}

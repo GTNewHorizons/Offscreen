@@ -8,9 +8,7 @@ import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.gui.inventory.GuiInventory;
 
 import org.lwjgl.sdl.SDLError;
 import org.lwjgl.sdl.SDLEvents;
@@ -30,10 +28,9 @@ import org.lwjglx.opengl.DrawableGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
-import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.core.Driver;
-import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import com.sbancuz.offscreen.mixins.early.MinecraftAccessor;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.window.input.HostedInput;
 
 import lombok.Getter;
@@ -61,7 +58,7 @@ public final class Window {
     private final Renderer renderer = new Renderer();
     /** The lwjgl input the hosted screens read; SDL events are recorded into it as they are drained. */
     private final HostedInput input = new HostedInput();
-    private final HostedStack screenStack = new HostedStack(input);
+    private final HostedStack screenStack = new HostedStack(this, input);
 
     @Getter
     private int pixelWidth = DEFAULT_WIDTH;
@@ -151,6 +148,8 @@ public final class Window {
 
     public void destroy() {
         if (sdlPtr == 0L) return;
+        // the keyboard shadow is released on every exit path
+        Driver.INSTANCE.releaseKeyShadow(this);
         MainThreadExec.runOnMainThread(() -> { SDLKeyboard.SDL_StopTextInput(sdlPtr); });
         restoreMcContext();
         renderer.awaitPresentation();
@@ -164,7 +163,7 @@ public final class Window {
         freeRing();
         restoreMcContext();
         Driver.INSTANCE.removeWindow(this);
-        disposeStack();
+        screenStack.disposeAll();
     }
 
     public static String sdlError() {
@@ -181,20 +180,8 @@ public final class Window {
         return screenStack;
     }
 
-    /** Pushes the entry for {@code s}; every screen has a host UI, vanilla's at least. */
-    public HostedScreen<?> pushScreen(final GuiScreen s) {
-        final HostedScreen<?> e = new HostedScreen<>(hostFor(s));
-        screenStack.pushEntry(e);
-        return e;
-    }
-
-    private HostUI hostFor(final GuiScreen s) {
-        if (UIRegistry.resolve(s) instanceof HostUI ui) return ui;
-        return new VanillaUI(s);
-    }
-
     public void tryRenderFrame() {
-        if (!isOpen()) return;
+        if (!isOpen() || destroyIfEmptied()) return;
         renderer.setFocused(focusState);
         if (!renderer.isTimeToRender()) return;
 
@@ -218,7 +205,7 @@ public final class Window {
         if (!renderer.ensureCorrectSize(pixelWidth, pixelHeight)) return;
         if (screenStack.isEmpty()) return;
 
-        input.record(this::drainEvents);
+        input.run(this::drainEvents);
 
         if (closeRequested) {
             closeRequested = false;
@@ -238,7 +225,7 @@ public final class Window {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
 
-            screenStack.runScoped(pixelWidth, pixelHeight, s -> {
+            screenStack.runScoped(s -> {
                 if (s.needsResize(guiWidth, guiHeight)) {
                     s.resize(guiWidth, guiHeight);
                 }
@@ -247,17 +234,22 @@ public final class Window {
         } finally {
             renderer.endFrame(mc);
         }
+        // a screen may have closed its own window
+        if (!isOpen()) return;
 
         renderer.present(sdlPtr, sharedContext, pixelWidth, pixelHeight);
-        destroyIfEmpty();
     }
 
     /** The close button: every screen closes top-down as if the player closed it, then the window goes. */
     public void close() {
-        for (int remaining = screenStack.size(); remaining > 0 && !screenStack.isEmpty(); remaining--) {
-            screenStack.closeTop(pixelWidth, pixelHeight);
-        }
+        while (!screenStack.isEmpty()) closeHosted(screenStack.top());
         destroy();
+    }
+
+    /** One entry and the ones above it close as if the player closed them; a container is told it lost its view. */
+    private void closeHosted(final HostedScreen<?> e) {
+        if (ServerContainerMultiplexer.INSTANCE.isInWorld()) e.close(true);
+        else screenStack.removeFrom(e);
     }
 
     /**
@@ -267,14 +259,15 @@ public final class Window {
      */
     public boolean runInScope(final Consumer<HostUI> action) {
         if (!isOpen() || screenStack.isEmpty()) return false;
-        screenStack.runScoped(pixelWidth, pixelHeight, s -> action.accept(s.screen()));
-        destroyIfEmpty();
+        screenStack.runScoped(s -> action.accept(s.ui()));
         return true;
     }
 
-    /** A window whose last screen closed itself goes, as the main window shows the game again. */
-    private void destroyIfEmpty() {
-        if (isOpen() && screenStack.isEmpty()) destroy();
+    /** A window whose last screen closed goes, as the main window shows the game again. */
+    private boolean destroyIfEmptied() {
+        if (!screenStack.wasEmptied()) return false;
+        destroy();
+        return true;
     }
 
     /** Whether the window has keyboard focus. */
@@ -350,7 +343,6 @@ public final class Window {
                         if ((key.mod() & SDLKeycode.SDL_KMOD_CTRL) != 0) {
                             c = (char) (sdlKeyCode & 0x1f);
                         }
-                        // Debug aid for a->s shift: log mismatches between scancode-derived and keycode
                         if (rawKeyCode != sdlKeyCode && rawKeyCode >= 32
                             && rawKeyCode <= 126
                             && sdlKeyCode >= 32
@@ -386,12 +378,7 @@ public final class Window {
                             0L),
                         new Keyboard.KeyEvent(scanKey, lwjglKey, c, state, System.nanoTime()));
 
-                    if (focusState) {
-                        final ByteBuffer keyArray = Keyboard.sdlKeyPressedArray;
-                        if (keyArray != null && sdlScanCode > 0 && sdlScanCode < keyArray.limit()) {
-                            keyArray.put(sdlScanCode, (byte) (key.down() ? 1 : 0));
-                        }
-                    }
+                    shadowKey(sdlScanCode, key.down());
                 }
                 case SDLEvents.SDL_EVENT_TEXT_INPUT -> {
                     final String text = event.text()
@@ -401,6 +388,13 @@ public final class Window {
                 default -> {}
             }
         }
+    }
+
+    /** Hosted key state goes only into the shadow this window owns, never into the array SDL owns. */
+    private void shadowKey(final int scancode, final boolean down) {
+        final ByteBuffer keys = Keyboard.sdlKeyPressedArray;
+        if (!Driver.INSTANCE.ownsKeyShadow(this) || keys == null) return;
+        if (scancode > 0 && scancode < keys.limit()) keys.put(scancode, (byte) (down ? 1 : 0));
     }
 
     private final IntBuffer wPtr = ByteBuffer.allocateDirect(4)
@@ -419,36 +413,27 @@ public final class Window {
         restoreMcContext();
     }
 
+    /** Replaces what the window shows by {@code ui}; the screens it showed close as if the player closed them. */
     public void setUI(HostUI ui) {
-        if (ui.getGuiScreen() instanceof GuiInventory) {
-            Offscreen.LOG.error("[Offscreen] Inventories are not supported in a separate window");
-
-            destroy();
-            return;
-        }
-        disposeStack();
-        screenStack.push(new HostedScreen<>(ui));
+        if (!screenStack.isEmpty()) closeHosted(screenStack.get(0));
+        screenStack.pushUI(ui);
     }
 
     public void push(HostUI ui) {
-        screenStack.push(new HostedScreen<>(ui));
+        screenStack.pushUI(ui);
     }
 
+    /** Closes the top screen as if the player closed it. The last screen is not popped. */
     public boolean pop() {
         if (screenStack.size() <= 1) return false;
-        final HostedScreen<?> popped = screenStack.pop();
-        popped.dispose();
-        if (!screenStack.isEmpty()) {
-            screenStack.top()
-                .requestResize();
-        }
+        closeHosted(screenStack.top());
         return true;
     }
 
     public HostUI getCurrentUI() {
         if (screenStack.isEmpty()) return null;
         return screenStack.top()
-            .screen();
+            .ui();
     }
 
     public int getScreenDepth() {
@@ -489,22 +474,14 @@ public final class Window {
      * lists scroll this way) gets the events that arrive between ticks.
      */
     public void update() {
-        if (!isOpen() || screenStack.isEmpty()) return;
+        if (!isOpen() || destroyIfEmptied() || screenStack.isEmpty()) return;
         // lwjgl3ify pumps SDL at the end of the frame, so this tick sees the window's events as the main one sees its
-        input.record(this::drainEvents);
-        screenStack.runScoped(pixelWidth, pixelHeight, s -> {
-            input.deliverListenerEvents();
+        input.run(this::drainEvents);
+        screenStack.runScoped(s -> {
+            if (s.receivesInput()) input.deliverListenerEvents();
+            else input.discardListenerEvents();
             s.handleInput();
             s.update();
         });
-        destroyIfEmpty();
-    }
-
-    /** Disposes every hosted UI top-down. Owners guard against reentry. */
-    private void disposeStack() {
-        while (!screenStack.isEmpty()) {
-            screenStack.pop()
-                .dispose();
-        }
     }
 }
