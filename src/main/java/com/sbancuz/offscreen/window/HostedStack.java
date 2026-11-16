@@ -43,8 +43,11 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         this.window = window;
         this.windowScopes = ScopePipeline.builder()
             .always(input)
-            .ifMod(ModCompat.NEI, () -> new NeiScope(this::resolveCurrentContainer))
+            .ifMod(ModCompat.NEI, () -> new NeiScope(this::resolveCurrentContainer, this::resolveMainWindowContainer))
             .build();
+    }
+    private @Nullable GuiContainer resolveMainWindowContainer() {
+        return multiplexer.mainWindow.screen() instanceof GuiContainer gc ? gc : null;
     }
 
     /** The container screen of the entry whose code runs now, for NEI. */

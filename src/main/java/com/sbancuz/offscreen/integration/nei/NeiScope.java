@@ -66,6 +66,7 @@ public final class NeiScope implements Scope {
     }
 
     private final Supplier<GuiContainer> containerSupplier;
+    private final Supplier<GuiContainer> mainWindowContainer;
     private final Ctx own = new Ctx();
     private final Ctx saved = new Ctx();
     private int enteredCount = 0;
@@ -96,8 +97,9 @@ public final class NeiScope implements Scope {
     };
     private final AtomicReference<ArrayList<ItemStack>> filteredItems = new AtomicReference<>();
 
-    public NeiScope(final Supplier<GuiContainer> containerSupplier) {
+    public NeiScope(final Supplier<GuiContainer> containerSupplier, final Supplier<GuiContainer> mainWindowContainer) {
         this.containerSupplier = containerSupplier;
+        this.mainWindowContainer = mainWindowContainer;
 
         saved.capture();
         saved.manager = NEIController.manager;
@@ -183,6 +185,10 @@ public final class NeiScope implements Scope {
         saved.apply();
         saved.applyViewState();
         NEIController.manager = saved.manager;
+
+        // Main window should not try to resize the bookmark panel, so NEI doesn't create confusion for the highlighted slot
+        final GuiContainer mainContainer = mainWindowContainer.get();
+        if (mainContainer != null) saved.bookmarkPanel.resize(mainContainer);
         saved.manager = null;
         saved.clear();
     }
