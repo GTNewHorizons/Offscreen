@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 import java.lang.reflect.Method;
 import java.util.regex.PatternSyntaxException;

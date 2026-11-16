@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.routing;
+package com.sbancuz.offscreen.scope.container.routing;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,11 +20,11 @@ import net.minecraft.network.play.server.S31PacketWindowProperty;
 import net.minecraft.network.play.server.S32PacketConfirmTransaction;
 import net.minecraft.network.play.server.S3APacketTabComplete;
 
-import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
-import com.sbancuz.offscreen.container.ServerContainer;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.scope.ScreenScope;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.scope.container.ServerContainer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.window.HostedScreen;
 import com.sbancuz.offscreen.window.HostedStack;
 

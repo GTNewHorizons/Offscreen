@@ -12,13 +12,13 @@ import com.cleanroommc.modularui.screen.ModularScreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.OffscreenAPI;
 import com.sbancuz.offscreen.api.UIRegistry;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.integration.mui2.Mui2Adapter;
 import com.sbancuz.offscreen.integration.mui2.Mui2UI;
 import com.sbancuz.offscreen.integration.mui2.SyncedMui2UI;
 import com.sbancuz.offscreen.integration.mui2.TestMui2ScreenNoNEI;
 import com.sbancuz.offscreen.integration.mui2.TestMui2ScreenWithNEI;
 import com.sbancuz.offscreen.integration.mui2.TestSyncedGui;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.relauncher.Side;

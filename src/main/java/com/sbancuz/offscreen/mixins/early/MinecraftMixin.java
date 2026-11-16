@@ -11,8 +11,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.core.Driver;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 /** Routes screen changes, the main window's input and updates, and right clicks through the multiplexer. */
 @Mixin(Minecraft.class)

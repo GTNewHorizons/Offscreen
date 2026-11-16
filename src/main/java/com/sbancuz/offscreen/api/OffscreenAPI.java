@@ -6,8 +6,8 @@ import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.core.Driver;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.window.Window;
 
 public final class OffscreenAPI {

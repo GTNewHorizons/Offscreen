@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 import java.util.Comparator;
 import java.util.List;
@@ -13,8 +13,8 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 
 import com.sbancuz.offscreen.config.ContainerProtocolConfig;
-import com.sbancuz.offscreen.container.ContainerAdapter.SlotOnClose;
-import com.sbancuz.offscreen.container.reopen.OpeningInteraction;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.SlotOnClose;
+import com.sbancuz.offscreen.scope.container.reopen.OpeningInteraction;
 
 /**
  * Client record of one server-backed container: the player inventory (window id 0, never

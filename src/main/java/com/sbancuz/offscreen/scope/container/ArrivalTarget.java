@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 import net.minecraft.client.gui.GuiScreen;
 

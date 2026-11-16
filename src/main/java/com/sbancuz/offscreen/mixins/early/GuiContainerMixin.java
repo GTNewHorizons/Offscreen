@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 /** Runs a container's close logic only once, and hides the cursor stack where it does not belong. */
 @Mixin(GuiContainer.class)

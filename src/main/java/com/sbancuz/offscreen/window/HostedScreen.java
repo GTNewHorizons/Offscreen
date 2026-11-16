@@ -10,11 +10,11 @@ import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.inventory.Container;
 
 import com.sbancuz.offscreen.api.HostUI;
-import com.sbancuz.offscreen.container.ScreenView;
-import com.sbancuz.offscreen.container.ServerContainer;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.scope.Scope;
 import com.sbancuz.offscreen.scope.ScreenScope;
+import com.sbancuz.offscreen.scope.container.ScreenView;
+import com.sbancuz.offscreen.scope.container.ServerContainer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 /** One entry of a hosted window's stack: a host UI, and the view it is for the container multiplexer. */
 public final class HostedScreen<T extends HostUI> implements ScreenView {

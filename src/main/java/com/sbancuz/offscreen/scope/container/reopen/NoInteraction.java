@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.reopen;
+package com.sbancuz.offscreen.scope.container.reopen;
 
 import java.util.function.Consumer;
 

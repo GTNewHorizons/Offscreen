@@ -16,15 +16,15 @@ import net.minecraftforge.common.MinecraftForge;
 import org.lwjglx.input.Keyboard;
 import org.lwjglx.opengl.Display;
 
-import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
-import com.sbancuz.offscreen.container.ScreenView;
-import com.sbancuz.offscreen.container.ServerContainer;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
-import com.sbancuz.offscreen.container.ServerProbes;
-import com.sbancuz.offscreen.container.routing.UnroutedMainScreenScope;
-import com.sbancuz.offscreen.container.routing.ViewScope;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.scope.ScreenScope;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.scope.container.ScreenView;
+import com.sbancuz.offscreen.scope.container.ServerContainer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ServerProbes;
+import com.sbancuz.offscreen.scope.container.routing.UnroutedMainScreenScope;
+import com.sbancuz.offscreen.scope.container.routing.ViewScope;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.eventhandler.EventPriority;

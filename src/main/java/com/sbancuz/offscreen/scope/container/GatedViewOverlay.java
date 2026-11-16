@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 import java.util.Optional;
 
@@ -10,7 +10,7 @@ import net.minecraft.util.StatCollector;
 
 import org.lwjgl.opengl.GL11;
 
-import com.sbancuz.offscreen.container.ServerContainer.State;
+import com.sbancuz.offscreen.scope.container.ServerContainer.State;
 
 import me.eigenraven.lwjgl3ify.api.Lwjgl3Aware;
 

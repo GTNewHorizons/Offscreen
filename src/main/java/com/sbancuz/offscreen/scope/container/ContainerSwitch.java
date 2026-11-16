@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -9,7 +9,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 
-import com.sbancuz.offscreen.container.ServerContainer.State;
+import com.sbancuz.offscreen.scope.container.ServerContainer.State;
 
 /**
  * Switches the server's open container from F to T: park the cursor stack, close F, reopen T,

@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 /** Short feedback shown over the views of a container: why a request was refused or failed. */
 public enum OverlayHint {

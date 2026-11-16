@@ -28,9 +28,9 @@ import org.lwjglx.opengl.DrawableGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.mixins.early.MinecraftAccessor;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.window.input.HostedInput;
 
 import lombok.Getter;

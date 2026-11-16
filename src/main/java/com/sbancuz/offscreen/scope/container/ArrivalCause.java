@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 /**
  * Why a probe was sent: the server opening something before the probe is answered was caused by

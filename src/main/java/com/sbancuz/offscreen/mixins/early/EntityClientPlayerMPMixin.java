@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 /** Routes {@code closeScreen} and the horse inventory request through the multiplexer. */
 @Mixin(EntityClientPlayerMP.class)

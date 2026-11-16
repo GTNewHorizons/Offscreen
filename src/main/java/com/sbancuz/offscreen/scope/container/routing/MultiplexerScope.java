@@ -1,6 +1,6 @@
-package com.sbancuz.offscreen.container.routing;
+package com.sbancuz.offscreen.scope.container.routing;
 
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 /** Code the multiplexer runs, and adapter writes it asks for: what it sends passes unchecked. */
 public final class MultiplexerScope extends RoutingScope {

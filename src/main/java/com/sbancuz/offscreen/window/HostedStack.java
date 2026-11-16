@@ -13,14 +13,14 @@ import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.compat.ModCompat;
-import com.sbancuz.offscreen.container.ServerContainer;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
-import com.sbancuz.offscreen.container.ServerProbes;
-import com.sbancuz.offscreen.container.routing.ViewScope;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.integration.nei.NeiScope;
 import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import com.sbancuz.offscreen.scope.ScopePipeline;
+import com.sbancuz.offscreen.scope.container.ServerContainer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ServerProbes;
+import com.sbancuz.offscreen.scope.container.routing.ViewScope;
 import com.sbancuz.offscreen.window.input.HostedInput;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;

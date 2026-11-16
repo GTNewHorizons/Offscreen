@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -16,7 +16,7 @@ import net.minecraft.network.play.client.C0FPacketConfirmTransaction;
 import net.minecraft.network.play.client.C14PacketTabComplete;
 
 import com.sbancuz.offscreen.config.ContainerProtocolConfig;
-import com.sbancuz.offscreen.container.reopen.OpeningInteraction;
+import com.sbancuz.offscreen.scope.container.reopen.OpeningInteraction;
 
 /**
  * Packets that ask the server what it has open, and their answers. A probe is a click the

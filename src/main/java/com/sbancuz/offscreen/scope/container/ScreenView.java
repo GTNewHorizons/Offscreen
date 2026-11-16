@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 import java.util.function.Consumer;
 
@@ -6,7 +6,7 @@ import javax.annotation.Nullable;
 
 import net.minecraft.client.gui.GuiScreen;
 
-import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.PayloadEffect;
 import com.sbancuz.offscreen.window.HostedScreen;
 import com.sbancuz.offscreen.window.MainWindow;
 

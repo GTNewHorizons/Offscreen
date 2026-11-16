@@ -29,11 +29,11 @@ import com.cleanroommc.modularui.screen.ModularContainer;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.widgets.slot.ModularCraftingSlot;
 import com.cleanroommc.modularui.widgets.slot.ModularSlot;
-import com.sbancuz.offscreen.container.ContainerAdapter;
-import com.sbancuz.offscreen.container.ServerContainer;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.mixins.late.ClientScreenHandlerAccessor;
 import com.sbancuz.offscreen.mixins.late.ModularNetworkSideInvoker;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter;
+import com.sbancuz.offscreen.scope.container.ServerContainer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 import cpw.mods.fml.common.network.internal.FMLProxyPacket;
 

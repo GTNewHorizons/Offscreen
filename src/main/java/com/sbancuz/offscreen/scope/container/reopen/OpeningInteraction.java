@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.reopen;
+package com.sbancuz.offscreen.scope.container.reopen;
 
 import java.util.function.Consumer;
 
@@ -9,7 +9,7 @@ import net.minecraft.network.Packet;
 import net.minecraft.network.play.client.C02PacketUseEntity;
 import net.minecraft.network.play.client.C08PacketPlayerBlockPlacement;
 
-import com.sbancuz.offscreen.container.ArrivalCause;
+import com.sbancuz.offscreen.scope.container.ArrivalCause;
 
 /**
  * The world interaction that opened a container: recorded from the outgoing packet, replayed

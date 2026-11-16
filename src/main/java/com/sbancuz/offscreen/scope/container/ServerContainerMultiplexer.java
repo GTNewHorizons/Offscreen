@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container;
+package com.sbancuz.offscreen.scope.container;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,18 +32,18 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.sbancuz.offscreen.config.ContainerProtocolConfig;
-import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
-import com.sbancuz.offscreen.container.ServerContainer.State;
-import com.sbancuz.offscreen.container.reopen.OpeningInteraction;
-import com.sbancuz.offscreen.container.routing.InboundPacketScope;
-import com.sbancuz.offscreen.container.routing.MainWindowScope;
-import com.sbancuz.offscreen.container.routing.MultiplexerScope;
-import com.sbancuz.offscreen.container.routing.OffThreadScope;
-import com.sbancuz.offscreen.container.routing.RoutingScope;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.mixins.early.MinecraftAccessor;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.scope.ScreenScope;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.scope.container.ServerContainer.State;
+import com.sbancuz.offscreen.scope.container.reopen.OpeningInteraction;
+import com.sbancuz.offscreen.scope.container.routing.InboundPacketScope;
+import com.sbancuz.offscreen.scope.container.routing.MainWindowScope;
+import com.sbancuz.offscreen.scope.container.routing.MultiplexerScope;
+import com.sbancuz.offscreen.scope.container.routing.OffThreadScope;
+import com.sbancuz.offscreen.scope.container.routing.RoutingScope;
 import com.sbancuz.offscreen.window.HostedScreen;
 import com.sbancuz.offscreen.window.MainWindow;
 import com.sbancuz.offscreen.window.Window;

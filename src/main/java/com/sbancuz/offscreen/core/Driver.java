@@ -8,7 +8,7 @@ import java.util.function.Predicate;
 
 import net.minecraft.client.Minecraft;
 
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 import com.sbancuz.offscreen.window.MainWindow;
 import com.sbancuz.offscreen.window.Window;
 import com.sbancuz.offscreen.window.input.InputRouter;

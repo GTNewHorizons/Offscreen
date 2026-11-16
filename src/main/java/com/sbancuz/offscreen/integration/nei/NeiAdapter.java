@@ -3,7 +3,7 @@ package com.sbancuz.offscreen.integration.nei;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.network.Packet;
 
-import com.sbancuz.offscreen.container.ContainerAdapter;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter;
 
 import cpw.mods.fml.common.network.internal.FMLProxyPacket;
 import io.netty.buffer.ByteBuf;

@@ -11,7 +11,7 @@ import com.cleanroommc.modularui.network.IPacket;
 import com.cleanroommc.modularui.network.packets.CloseAllGuiPacket;
 import com.cleanroommc.modularui.network.packets.CloseGuiPacket;
 import com.cleanroommc.modularui.network.packets.ReopenGuiPacket;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 /**
  * Server-sent ModularUI2 close and reopen packets change the open container without an S2E or

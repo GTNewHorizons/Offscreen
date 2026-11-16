@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.routing;
+package com.sbancuz.offscreen.scope.container.routing;
 
 import java.util.function.Consumer;
 
@@ -6,9 +6,9 @@ import javax.annotation.Nullable;
 
 import net.minecraft.client.gui.GuiScreen;
 
-import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
-import com.sbancuz.offscreen.container.ScreenView;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.scope.container.ScreenView;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 /** Outside every other scope: the main window, acting for its view while it shows a container screen. */
 public final class MainWindowScope extends RoutingScope {

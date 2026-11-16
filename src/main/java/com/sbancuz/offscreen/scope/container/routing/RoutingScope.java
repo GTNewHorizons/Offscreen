@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.routing;
+package com.sbancuz.offscreen.scope.container.routing;
 
 import java.util.function.Consumer;
 
@@ -15,13 +15,13 @@ import net.minecraft.network.play.client.C11PacketEnchantItem;
 import net.minecraft.network.play.client.C14PacketTabComplete;
 import net.minecraft.network.play.client.C17PacketCustomPayload;
 
-import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
-import com.sbancuz.offscreen.container.ScreenView;
-import com.sbancuz.offscreen.container.ServerContainer;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
-import com.sbancuz.offscreen.container.ServerProbes;
-import com.sbancuz.offscreen.container.reopen.OpeningInteraction;
 import com.sbancuz.offscreen.scope.Scope;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.scope.container.ScreenView;
+import com.sbancuz.offscreen.scope.container.ServerContainer;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ServerProbes;
+import com.sbancuz.offscreen.scope.container.reopen.OpeningInteraction;
 
 import cpw.mods.fml.common.network.internal.FMLProxyPacket;
 

@@ -1,4 +1,4 @@
-package com.sbancuz.offscreen.container.routing;
+package com.sbancuz.offscreen.scope.container.routing;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,9 +8,9 @@ import javax.annotation.Nullable;
 
 import net.minecraft.client.gui.GuiScreen;
 
-import com.sbancuz.offscreen.container.ContainerAdapter.PayloadEffect;
-import com.sbancuz.offscreen.container.ScreenView;
-import com.sbancuz.offscreen.container.ServerContainerMultiplexer;
+import com.sbancuz.offscreen.scope.container.ContainerAdapter.PayloadEffect;
+import com.sbancuz.offscreen.scope.container.ScreenView;
+import com.sbancuz.offscreen.scope.container.ServerContainerMultiplexer;
 
 /**
  * A run of a view's input, update or draw. Whether the view is active is fixed at entry.
